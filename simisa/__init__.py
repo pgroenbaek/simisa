@@ -32,6 +32,9 @@ __all__ = [
     'BlockReader', 'BlockWriter', 'BlockFormat',
     'BlockReaderError', 'BlockWriterError',
     'StfReaderError',
+    'VerbosityLevel', 'normalize_verbosity', 'get_global_verbosity',
+    'set_global_verbosity', 'set_verbose_output',
+    'verbose_print',
     'roaddatabase', 'rdb',
     'shape', 's', 'terrain', 't',
     'tracksections', 'tsection',
@@ -54,6 +57,11 @@ from .stf import StfReader, StfReaderError
 from .reader import BlockReader, BlockReaderError
 from .writer import BlockWriter, BlockWriterError
 from .format import BlockFormat
+from .verbose import (
+    VerbosityLevel, normalize_verbosity, get_global_verbosity,
+    set_global_verbosity, set_verbose_output,
+    verbose_print
+)
 
 from . import roaddatabase
 from . import roaddatabase as rdb

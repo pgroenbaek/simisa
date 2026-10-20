@@ -20,7 +20,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import os
 import re
 import codecs
-from typing import Optional
+from typing import Optional, Union
+
+from .verbose import VerbosityLevel, normalize_verbosity, verbose_print
 
 
 
@@ -128,7 +130,7 @@ def peek_first_include(filepath: str) -> Optional[str]:
     return include_match.group(2)
 
 
-def resolve_include(include_path: str, filepath: str) -> str:
+def resolve_include(include_path: str, filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> str:
     """
     Resolves a single include (by path relative to `filepath`)
     and returns its fully expanded content (including nested includes).
@@ -136,6 +138,7 @@ def resolve_include(include_path: str, filepath: str) -> str:
     Args:
         include_path: Path of the include to resolve (relative to `filepath`).
         filepath: Base file path used to resolve the include path.
+        verbose: Optional verbosity level.
 
     Returns:
         Fully expanded content of the included file.
@@ -153,6 +156,9 @@ def resolve_include(include_path: str, filepath: str) -> str:
             f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
         )
 
+    vlevel = normalize_verbosity(verbose)
+    verbose_print("include", f"Resolving include '{include_path}' relative to '{filepath}'", VerbosityLevel.NORMAL, vlevel)
+
     base_dir = os.path.dirname(filepath)
 
     include_filepath = os.path.normpath(
@@ -160,6 +166,7 @@ def resolve_include(include_path: str, filepath: str) -> str:
     )
 
     if not os.path.isfile(include_filepath):
+        verbose_print("include", f"Failed to resolve include: file '{include_filepath}' not found", VerbosityLevel.DEBUG, vlevel)
         raise UnresolvableIncludeError(
             f"Could not resolve include '{include_path}' from '{filepath}'"
         )
@@ -179,10 +186,11 @@ def resolve_include(include_path: str, filepath: str) -> str:
                 f"Could not decode include '{include_filepath}'"
             ) from e
 
-    return resolve_includes(include_text, include_filepath)
+    verbose_print("include", f"Successfully loaded include '{include_filepath}'", VerbosityLevel.NORMAL, vlevel)
+    return resolve_includes(include_text, include_filepath, verbose=verbose)
 
 
-def resolve_includes(text: str, filepath: str) -> str:
+def resolve_includes(text: str, filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> str:
     """
     Resolves all include statements recursively and returns the fully
     expanded text.
@@ -193,6 +201,7 @@ def resolve_includes(text: str, filepath: str) -> str:
     Args:
         text: Source text to resolve includes in.
         filepath: Path of the source file the text originated from.
+        verbose: Optional verbosity level.
 
     Returns:
         The full text with all includes resolved.
@@ -211,6 +220,7 @@ def resolve_includes(text: str, filepath: str) -> str:
             f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
         )
 
+    vlevel = normalize_verbosity(verbose)
     include_re = re.compile(
         r'include\s*\(\s*([\'"])(.*?)\1\s*\)',
         re.IGNORECASE
@@ -225,12 +235,14 @@ def resolve_includes(text: str, filepath: str) -> str:
             break
 
         include_path = include_match.group(2)
+        verbose_print("include", f"Found include statement: '{include_path}' in '{filepath}'", VerbosityLevel.NORMAL, vlevel)
 
         include_filepath = os.path.normpath(
             os.path.join(base_dir, include_path)
         )
 
         if not os.path.isfile(include_filepath):
+            verbose_print("include", f"Failed to resolve include: file '{include_filepath}' not found", VerbosityLevel.DEBUG, vlevel)
             raise UnresolvableIncludeError(
                 f"Could not resolve include '{include_path}' "
                 f"from '{filepath}'"
@@ -252,9 +264,11 @@ def resolve_includes(text: str, filepath: str) -> str:
                     f"Could not decode include '{include_filepath}'"
                 ) from e
 
+        verbose_print("include", f"Loaded include '{include_filepath}', expanding recursively", VerbosityLevel.NORMAL, vlevel)
         include_text = resolve_includes(
             include_text,
-            include_filepath
+            include_filepath,
+            verbose=verbose
         )
 
         text = (

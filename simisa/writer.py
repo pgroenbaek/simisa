@@ -29,6 +29,7 @@ from typing import Optional, BinaryIO, TextIO, Callable, Any, Union
 
 from .format import BlockFormat
 from .token_id import TokenID
+from .verbose import VerbosityLevel, normalize_verbosity, verbose_print
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,8 @@ class BlockWriter(ABC):
         fileversion: int,
         is_binary: bool = False,
         is_unicode: bool = True,
-        is_compressed: bool = False
+        is_compressed: bool = False,
+        verbose: Union[bool, int, VerbosityLevel, None] = None
     ) -> "BlockWriter":
         """
         Open a file for writing and construct an appropriate BlockWriter.
@@ -136,6 +138,7 @@ class BlockWriter(ABC):
             is_binary (bool, optional): Whether to write binary data. Defaults to False.
             is_unicode (bool, optional): Whether to use UTF-16 LE encoding. Defaults to True.
             is_compressed (bool, optional): Whether to compress the output. Defaults to False.
+            verbose: Optional verbosity level.
 
         Returns:
             BlockWriter: Instance of `BinaryFileWriter` or `TextFileWriter`.
@@ -162,9 +165,18 @@ class BlockWriter(ABC):
                 f"but got {type(value).__name__}"
             )
         
+        vlevel = normalize_verbosity(verbose)
         fileformat = 'b' if is_binary else 't'
         subheader = f"JINX0{filetype}{fileversion}{fileformat}______\r\n"
         encoding = "utf-16-le" if is_unicode else "ascii"
+
+        verbose_print(
+            "writer",
+            f"Opening '{filepath}' for writing (format={'binary' if is_binary else 'text'}, "
+            f"unicode={is_unicode}, compressed={is_compressed})",
+            VerbosityLevel.NORMAL,
+            vlevel
+        )
 
         f = open(filepath, "wb")
 
@@ -181,19 +193,26 @@ class BlockWriter(ABC):
             stream = f
 
         stream.write(subheader.encode(encoding))
+        verbose_print(
+            "header",
+            f"Wrote header: '{'SIMISA@F' if is_compressed else 'SIMISA@@@@@@@@@@'}', subheader: '{subheader.strip()}'",
+            VerbosityLevel.NORMAL,
+            vlevel
+        )
 
         if is_binary:
             token_offset = 300 if filetype == "w" else 0
-            return BinaryFileWriter(stream, filepath, token_offset, is_unicode, is_compressed)
+            return BinaryFileWriter(stream, filepath, token_offset, is_unicode, is_compressed, verbose=verbose)
 
-        return TextFileWriter(stream, filepath, encoding, is_compressed)
+        return TextFileWriter(stream, filepath, encoding, is_compressed, verbose=verbose)
     
     @staticmethod
     def to_string(
         write_fn: Callable[["BlockWriter"], Any],
         *,
         filetype: str,
-        fileversion: int
+        fileversion: int,
+        verbose: Union[bool, int, VerbosityLevel, None] = None
     ) -> str:
         """
         Generate SIMISA text data in memory using a callback.
@@ -206,6 +225,7 @@ class BlockWriter(ABC):
                 the desired content.
             filetype (str): SIMISA file type identifier.
             fileversion (int): SIMISA file version.
+            verbose: Optional verbosity level.
 
         Returns:
             str: The generated SIMISA text data.
@@ -238,15 +258,22 @@ class BlockWriter(ABC):
         if not write_fn_params or write_fn_params[0].kind not in positional_params:
             raise TypeError("'write_fn' must accept a BlockWriter as its first parameter")
 
+        vlevel = normalize_verbosity(verbose)
         stream = io.StringIO()
 
-        writer = TextFileWriter(stream, filepath="<string>", encoding="utf-8", is_compressed=False)
+        writer = TextFileWriter(stream, filepath="<string>", encoding="utf-8", is_compressed=False, verbose=verbose)
 
         header = "SIMISA@@@@@@@@@@"
         subheader = f"JINX0{filetype}{fileversion}t______\r\n"
 
         stream.write(header)
         stream.write(subheader)
+        verbose_print(
+            "header",
+            f"Wrote string header: '{header}', subheader: '{subheader.strip()}'",
+            VerbosityLevel.NORMAL,
+            vlevel
+        )
 
         write_fn(writer)
         writer.flush()
@@ -323,7 +350,8 @@ class TextBlockWriter(BlockWriter):
         self,
         stream: Optional[Union[io.TextIOBase, io.StringIO]] = None,
         parent: Optional['TextBlockWriter'] = None,
-        encoding: str = "utf-8"
+        encoding: str = "utf-8",
+        verbose: Union[bool, int, VerbosityLevel, None] = None
     ):
         self.stream = stream
         self.parent = parent
@@ -338,6 +366,7 @@ class TextBlockWriter(BlockWriter):
         self._lines_written = 0
         self._written_bytes = 0
         self._closed = False
+        self.verbosity: VerbosityLevel = normalize_verbosity(verbose) if verbose is not None else (parent.verbosity if parent else normalize_verbosity(None))
 
     def _trim_trailing_whitespace(self, trim_chars=None):
         if self.block_format.allow_space_at_line_end:
@@ -445,12 +474,21 @@ class TextBlockWriter(BlockWriter):
         sub_block = TextBlockWriter(
             stream=self.stream,
             parent=self,
-            encoding=self.encoding
+            encoding=self.encoding,
+            verbose=self.verbosity
         )
 
         sub_block.block_format = block_format
         sub_block._writing_block = True
+        sub_block.block_id = block_id
         
+        verbose_print(
+            "block",
+            f"Writing block: '{block_id.name}'" + (f" (label: {block_label})" if block_label else ""),
+            VerbosityLevel.NORMAL if self.depth == 0 else VerbosityLevel.DETAILED,
+            self.verbosity
+        )
+
         sub_block._write_token(f"{block_id.name}")
 
         if block_label is not None:
@@ -473,6 +511,13 @@ class TextBlockWriter(BlockWriter):
         if not self._writing_block or self._closed:
             return
         
+        verbose_print(
+            "block",
+            f"End of block: '{getattr(self, 'block_id', None).name if getattr(self, 'block_id', None) else '<unknown>'}'",
+            VerbosityLevel.DETAILED,
+            self.verbosity
+        )
+
         self.depth -= 1
 
         if self.block_format.newline_before_closing:
@@ -519,6 +564,8 @@ class TextBlockWriter(BlockWriter):
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write count: {value}", VerbosityLevel.DEBUG, self.verbosity)
+
         if value == 0 and not self.block_format.enable_zero_count_newline:
             self._write_token(str(value))
 
@@ -535,24 +582,28 @@ class TextBlockWriter(BlockWriter):
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write flags: 0x{value:08x}", VerbosityLevel.DEBUG, self.verbosity)
         self._write_value(f"{value:08x}")
 
     def write_int(self, value: int):
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write int: {value}", VerbosityLevel.DEBUG, self.verbosity)
         self._write_value(str(value))
 
     def write_uint(self, value: int):
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write uint: {value}", VerbosityLevel.DEBUG, self.verbosity)
         self._write_value(str(value))
 
     def write_float(self, value: float):
         if not isinstance(value, (int, float)):
             raise TypeError(f"Parameter 'value' must be float or int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write float: {value}", VerbosityLevel.DEBUG, self.verbosity)
         if float(value).is_integer(): # Allow .0 fractions to be omitted
             text = str(int(value))
         else:
@@ -568,12 +619,14 @@ class TextBlockWriter(BlockWriter):
         if not isinstance(value, str):
             raise TypeError(f"Parameter 'value' must be str, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write string: '{value}'", VerbosityLevel.DEBUG, self.verbosity)
         self._write_value(value)
 
     def write_comment(self, text: str):
         if not isinstance(text, str):
             raise TypeError(f"Parameter 'text' must be str, but got {type(text).__name__}")
         
+        verbose_print("write", f"Write comment: '{text}'", VerbosityLevel.DEBUG, self.verbosity)
         self._write_token("_SKIP")
 
         if self.block_format.newline_before_start:
@@ -630,12 +683,14 @@ class TextFileWriter(TextBlockWriter):
         stream: Union[io.TextIOBase, io.StringIO],
         filepath: str,
         encoding="utf-8",
-        is_compressed: bool = False
+        is_compressed: bool = False,
+        verbose: Union[bool, int, VerbosityLevel, None] = None
     ):
         super().__init__(
             stream=stream,
             parent=None,
-            encoding=encoding
+            encoding=encoding,
+            verbose=verbose
         )
         self.filepath = filepath
         self.is_compressed = is_compressed
@@ -670,6 +725,15 @@ class TextFileWriter(TextBlockWriter):
                 f.seek(size_position) # After SIMISA@F
                 f.write(uncompressed_size.to_bytes(4, "little"))
 
+            verbose_print(
+                "writer",
+                f"Patched uncompressed size ({uncompressed_size} bytes) in '{self.filepath}'",
+                VerbosityLevel.DETAILED,
+                self.verbosity
+            )
+
+        verbose_print("writer", f"Closed writer for '{self.filepath}'", VerbosityLevel.NORMAL, self.verbosity)
+
 
 class BinaryBlockWriter(BlockWriter):
     _UINT32 = struct.Struct("<I")
@@ -682,7 +746,8 @@ class BinaryBlockWriter(BlockWriter):
         self,
         stream: Optional[BinaryIO],
         parent: Optional["BinaryBlockWriter"] = None,
-        token_offset: int = 0
+        token_offset: int = 0,
+        verbose: Union[bool, int, VerbosityLevel, None] = None
     ):
         self.stream = stream
         self.parent = parent
@@ -693,6 +758,7 @@ class BinaryBlockWriter(BlockWriter):
         self._buffer = io.BytesIO()
         self._writing_block: bool = False
         self._written_bytes: int = 0
+        self.verbosity: VerbosityLevel = normalize_verbosity(verbose) if verbose is not None else (parent.verbosity if parent else normalize_verbosity(None))
 
     def _write_bytes(self, data: bytes) -> None:
         self._buffer.write(data)
@@ -706,12 +772,20 @@ class BinaryBlockWriter(BlockWriter):
         sub_block = BinaryBlockWriter(
             stream=self.stream,
             parent=self,
-            token_offset=self.token_offset
+            token_offset=self.token_offset,
+            verbose=self.verbosity
         )
 
         sub_block.label = block_label
         sub_block.id = block_id
         sub_block._writing_block = True
+
+        verbose_print(
+            "block",
+            f"Writing binary block: '{block_id.name}'" + (f" (label: {block_label})" if block_label else ""),
+            VerbosityLevel.NORMAL if self.parent is None else VerbosityLevel.DETAILED,
+            self.verbosity
+        )
 
         return sub_block
 
@@ -735,6 +809,13 @@ class BinaryBlockWriter(BlockWriter):
         header_bytes = self._BLOCK_HEADER.pack(raw_id, self.flags, size)
         block_bytes = header_bytes + label_bytes + payload
 
+        verbose_print(
+            "block",
+            f"End of binary block: '{self.id.name if self.id else '<unknown>'}' (size={size})",
+            VerbosityLevel.DETAILED,
+            self.verbosity
+        )
+
         if self.parent is not None:
             self.parent._buffer.write(block_bytes)
 
@@ -748,36 +829,42 @@ class BinaryBlockWriter(BlockWriter):
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write count: {value}", VerbosityLevel.DEBUG, self.verbosity)
         self.write_int(value)
 
     def write_flags(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write flags: 0x{value:08x}", VerbosityLevel.DEBUG, self.verbosity)
         self._write_bytes(self._UINT32.pack(value))
 
     def write_int(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write int: {value}", VerbosityLevel.DEBUG, self.verbosity)
         self._write_bytes(self._INT32.pack(value))
 
     def write_uint(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write uint: {value}", VerbosityLevel.DEBUG, self.verbosity)
         self._write_bytes(self._UINT32.pack(value))
 
     def write_float(self, value: float) -> None:
         if not isinstance(value, (int, float)):
             raise TypeError(f"Parameter 'value' must be float or int, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write float: {value}", VerbosityLevel.DEBUG, self.verbosity)
         self._write_bytes(self._FLOAT32.pack(value))
 
     def write_string(self, value: str) -> None:
         if not isinstance(value, str):
             raise TypeError(f"Parameter 'value' must be str, but got {type(value).__name__}")
         
+        verbose_print("write", f"Write string: '{value}'", VerbosityLevel.DEBUG, self.verbosity)
         if not value:
             self._write_bytes(self._UINT16.pack(0))
             return
@@ -790,6 +877,7 @@ class BinaryBlockWriter(BlockWriter):
     def write_comment(self, text: str):
         if not isinstance(text, str):
             raise TypeError(f"Parameter 'text' must be str, but got {type(text).__name__}")
+        verbose_print("write", f"Write comment: '{text}'", VerbosityLevel.DEBUG, self.verbosity)
 
     def flush(self):
         if self.stream:
@@ -808,12 +896,14 @@ class BinaryFileWriter(BinaryBlockWriter):
         filepath: str,
         token_offset: int = 0,
         is_unicode: bool = False,
-        is_compressed: bool = False
+        is_compressed: bool = False,
+        verbose: Union[bool, int, VerbosityLevel, None] = None
     ):
         super().__init__(
             stream=stream,
             parent=None,
-            token_offset=token_offset
+            token_offset=token_offset,
+            verbose=verbose
         )
         self.filepath = filepath
         self.is_unicode = is_unicode
@@ -857,3 +947,12 @@ class BinaryFileWriter(BinaryBlockWriter):
                 size_position = 18 if self.is_unicode else 8
                 f.seek(size_position) # After SIMISA@F
                 f.write(uncompressed_size.to_bytes(4, "little"))
+
+            verbose_print(
+                "writer",
+                f"Patched uncompressed size ({uncompressed_size} bytes) in '{self.filepath}'",
+                VerbosityLevel.DETAILED,
+                self.verbosity
+            )
+
+        verbose_print("writer", f"Closed writer for '{self.filepath}'", VerbosityLevel.NORMAL, self.verbosity)
