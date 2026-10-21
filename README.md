@@ -54,11 +54,11 @@ Not all file types used with MSTS and Open Rails are currently implemented. You 
 | `tdb`      | `trackdatabase`  | `.tdb`                  | Yes        | No          |
 | `tsection` | `tracksections`  | `.dat` (`tsection.dat`) | Yes        | No          |
 
-When loading files, the module seamlessly takes care of handling compression and text/binary format based on the information found in the file header.
-
 ### Reading files
 
-Files on disk can be read using the `.load()` function of each submodule.
+Files on disk can be read using the `.load()` function of each submodule. This function looks deceptively simple from the outside.
+
+Under the hood, `.load()` seamlessly takes care of handling compression and text/binary format based on information found in the file header.
 
 ```python
 from simisa import s, t, w, rdb, tdb, tsection
@@ -73,7 +73,7 @@ tsection_obj = tsection.load("path/to/tsection.dat")
 
 To read a text string, the `.loads()` function can be used instead. This function takes an in-memory string as input and returns the corresponding object.
 
-Compressed or binary data is not supported using this function.
+Compressed or binary data is not supported using the `.loads()` function.
 
 ```python
 from simisa import s, t, w, rdb, tdb, tsection
@@ -85,6 +85,8 @@ rdb_obj = rdb.loads(rdb_text)
 tdb_obj = tdb.loads(tdb_text)
 tsection_obj = tsection.loads(tsection_text)
 ```
+
+These functions are also not sensitive to unexpected whitespace formatting in STF files, such as extra newlines, tabs and spaces in odd places that can make other tools choke.
 
 ### Writing files
 
@@ -112,15 +114,38 @@ world_text = w.dumps(world_obj)
 
 #### Compressed
 
-To write compressed data to disk set the `compressed` parameter to `True`:
+To write compressed text data to disk set the `compressed` parameter to `True`:
 
 ```python
 from simisa import s, t, w
 
-s.dump(shape_file, "path/to/shapefile.s", compressed=True)
-t.dump(terrain_file, "path/to/terrainfile.t", compressed=True)
-w.dump(world_file, "path/to/worldfile.w", compressed=True)
+s.dump(shape_obj, "path/to/shapefile.s", compressed=True)
+t.dump(terrain_obj, "path/to/terrainfile.t", compressed=True)
+w.dump(world_obj, "path/to/worldfile.w", compressed=True)
 ```
+
+#### Binary
+
+To write binary data to disk set the `binary` parameter to `True`:
+
+```python
+from simisa import s, t, w
+
+s.dump(shape_obj, "path/to/shapefile.s", binary=True)
+t.dump(terrain_obj, "path/to/terrainfile.t", binary=True)
+w.dump(world_obj, "path/to/worldfile.w", binary=True)
+```
+
+And of course binary data may also be compressed:
+
+```python
+from simisa import s, t, w
+
+s.dump(shape_obj, "path/to/shapefile.s", binary=True, compressed=True)
+t.dump(terrain_obj, "path/to/terrainfile.t", binary=True, compressed=True)
+w.dump(world_obj, "path/to/worldfile.w", binary=True, compressed=True)
+```
+
 
 ### Accessing the object trees
 
@@ -203,14 +228,43 @@ simisa.read_fileversion("path/to/shapefile.s")
 
 #### Checking file format
 
-To determine file format use `is_unicode`, `is_text` and `is_binary`. These functions return `True` or `False` depending on the format. They may also return `None` if the file has no valid header or if the module is unable to determine the format.
+To determine file format use `is_utf16le`, `is_text` and `is_binary`. These functions return `True` or `False` depending on the format. They may also return `None` if the file has no valid header or if the module is unable to determine the format.
 
 ```python
 import simisa
 
-simisa.is_unicode("path/to/shapefile.s")
+simisa.is_utf16le("path/to/shapefile.s")
 simisa.is_text("path/to/shapefile.s")
 simisa.is_binary("path/to/shapefile.s")
+```
+
+### Using progress callbacks
+
+
+
+
+### Enabling verbose logging
+
+To enable verbose logging use the `logging` module. You can use either `logging.INFO` or `logging.DEBUG` depending on how much detail is needed. The latter provides everything, including all STF tokens, blocks, and values read.
+
+Here's an example:
+
+```python
+import logging
+from simisa import s
+
+logging.basicConfig(level=logging.DEBUG)
+
+shape_obj = s.load("/path/to/shapefile.s", verbose=logging.DEBUG)
+```
+
+To write the output to a file you can instead use `basicConfig` as follows:
+
+```python
+logging.basicConfig(
+    filename="output.log",
+    level=logging.DEBUG,
+)
 ```
 
 ## Running Tests
