@@ -22,6 +22,7 @@ from typing import List
 from .. import TokenID
 from ..format import BlockFormat
 from ..writer import BlockWriter
+from ..verbosity import Verbose
 from .models import *
 
 
@@ -30,7 +31,8 @@ def dump(
     filepath: str,
     binary: bool = False,
     ascii: bool = False,
-    compressed: bool = False
+    compressed: bool = False,
+    verbose: Verbose = None
 ) -> None:
     """
     Write a shape object to disk.
@@ -44,6 +46,7 @@ def dump(
         binary (bool): Whether to write binary data. Defaults to False.
         ascii (bool): Whether to write ASCII data. Defaults to False. Always True when binary or compressed.
         compressed (bool): Whether to write compressed data. Defaults to False.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Raises:
         TypeError: If any parameter has an unexpected type.
@@ -72,12 +75,13 @@ def dump(
         fileversion=1,
         is_binary=binary,
         is_utf16le=not ascii and not binary and not compressed,
-        is_compressed=compressed
+        is_compressed=compressed,
+        verbose=verbose
     ) as writer:
         write_shape(writer, shape)
 
 
-def dumps(shape: Shape) -> str:
+def dumps(shape: Shape, verbose: Verbose = None) -> str:
     """
     Write a shape object to a string.
 
@@ -86,6 +90,7 @@ def dumps(shape: Shape) -> str:
 
     Args:
         shape (Shape): The shape object to write.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         str: The string containing the shape data.
@@ -99,7 +104,8 @@ def dumps(shape: Shape) -> str:
     shape_text = BlockWriter.to_string(
         lambda writer: write_shape(writer, shape),
         filetype="s",
-        fileversion=1
+        fileversion=1,
+        verbose=verbose
     )
 
     return shape_text

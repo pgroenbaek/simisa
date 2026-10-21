@@ -138,7 +138,7 @@ class BlockWriter(ABC):
             is_binary (bool, optional): Whether to write binary data. Defaults to False.
             is_utf16le (bool, optional): Whether to use UTF-16 LE encoding. Defaults to True.
             is_compressed (bool, optional): Whether to compress the output. Defaults to False.
-            verbose (Verbose, optional): Optional verbosity level.
+            verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:
             BlockWriter: Instance of `BinaryFileWriter` or `TextFileWriter`.
@@ -251,7 +251,7 @@ class BlockWriter(ABC):
                 the desired content.
             filetype (str): SIMISA file type identifier.
             fileversion (int): SIMISA file version.
-            verbose (Verbose, optional): Optional verbosity level.
+            verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:
             str: The generated SIMISA text data.

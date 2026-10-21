@@ -23,13 +23,14 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..verbosity import Verbose
 from .models import *
 
 logger = logging.getLogger(__name__)
 
 
 
-def load(filepath: str) -> Shape:
+def load(filepath: str, verbose: Verbose = None) -> Shape:
     """
     Load and parse a shape file from disk.
 
@@ -39,6 +40,7 @@ def load(filepath: str) -> Shape:
 
     Args:
         filepath (str): Path to the shape file.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         Shape: The parsed shape object.
@@ -55,7 +57,7 @@ def load(filepath: str) -> Shape:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath) as reader:
+    with BlockReader.open(filepath, verbose=verbose) as reader:
 
         if not reader.filetype == 's':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a shape file?")
@@ -63,7 +65,7 @@ def load(filepath: str) -> Shape:
         return read_shape(reader)
 
 
-def loads(shape_text: str) -> Shape:
+def loads(shape_text: str, verbose: Verbose = None) -> Shape:
     """
     Parse a shape from a string containing shape data.
 
@@ -73,6 +75,7 @@ def loads(shape_text: str) -> Shape:
 
     Args:
         shape_text (str): String containing shape file data.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         Shape: The parsed shape object.
@@ -88,7 +91,7 @@ def loads(shape_text: str) -> Shape:
     if not isinstance(shape_text, str):
         raise TypeError(f"Parameter 'shape_text' must be str, but got {type(shape_text).__name__}")
 
-    reader = BlockReader.from_string(shape_text)
+    reader = BlockReader.from_string(shape_text, verbose=verbose)
 
     if not reader.filetype == 's':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a shape file?")
