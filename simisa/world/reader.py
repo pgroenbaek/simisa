@@ -24,6 +24,7 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..verbosity import Verbose
 from ..tracksections.reader import read_local_tracksections
 from .models import *
 
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def load(filepath: str) -> World:
+def load(filepath: str, verbose: Verbose = None) -> World:
     """
     Load and parse a world file from disk.
 
@@ -41,6 +42,7 @@ def load(filepath: str) -> World:
 
     Args:
         filepath (str): Path to the world file.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         World: The parsed world object.
@@ -57,7 +59,7 @@ def load(filepath: str) -> World:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath) as reader:
+    with BlockReader.open(filepath, verbose=verbose) as reader:
 
         if not reader.filetype == 'w':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a world file?")
@@ -72,7 +74,7 @@ def load(filepath: str) -> World:
         return world
 
 
-def loads(world_text: str) -> World:
+def loads(world_text: str, verbose: Verbose = None) -> World:
     """
     Parse a world file from a string containing world data.
 
@@ -82,6 +84,7 @@ def loads(world_text: str) -> World:
 
     Args:
         world_text (str): String containing world file data.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         World: The parsed world object.
@@ -97,7 +100,7 @@ def loads(world_text: str) -> World:
     if not isinstance(world_text, str):
         raise TypeError(f"Parameter 'world_text' must be str, but got {type(world_text).__name__}")
 
-    reader = BlockReader.from_string(world_text)
+    reader = BlockReader.from_string(world_text, verbose=verbose)
 
     if not reader.filetype == 'w':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a world file?")

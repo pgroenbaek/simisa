@@ -24,13 +24,14 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..verbosity import Verbose
 from .models import *
 
 logger = logging.getLogger(__name__)
 
 
 
-def load(filepath: str) -> TSection:
+def load(filepath: str, verbose: Verbose = None) -> TSection:
     """
     Load and parse a tsection file from disk (both local/global tsection.dat).
 
@@ -43,6 +44,7 @@ def load(filepath: str) -> TSection:
 
     Args:
         filepath (str): Path to the tracksections file.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         TSection: The parsed tracksections object.
@@ -59,7 +61,7 @@ def load(filepath: str) -> TSection:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath) as reader:
+    with BlockReader.open(filepath, verbose=verbose) as reader:
 
         if reader.filetype not in ('F', 'T'):
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a tsection file?")
@@ -67,7 +69,7 @@ def load(filepath: str) -> TSection:
         return read_tsection(reader)
 
 
-def loads(tsection_text: str) -> TSection:
+def loads(tsection_text: str, verbose: Verbose = None) -> TSection:
     """
     Parse tracksections from a string containing tsection data (both local/global tsection.dat).
 
@@ -80,6 +82,7 @@ def loads(tsection_text: str) -> TSection:
 
     Args:
         tsection_text (str): String containing tracksections file data.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         TSection: The parsed tracksections object.
@@ -95,7 +98,7 @@ def loads(tsection_text: str) -> TSection:
     if not isinstance(tsection_text, str):
         raise TypeError(f"Parameter 'tsection_text' must be str, but got {type(tsection_text).__name__}")
 
-    reader = BlockReader.from_string(tsection_text)
+    reader = BlockReader.from_string(tsection_text, verbose=verbose)
 
     if reader.filetype not in ('F', 'T'):
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a tsection file?")

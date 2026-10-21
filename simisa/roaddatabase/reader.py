@@ -22,12 +22,13 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..verbosity import Verbose
 from ..trackdatabase.reader import read_track_nodes, read_tr_item_table
 from .models import RoadDB
 
 
 
-def load(filepath: str) -> RoadDB:
+def load(filepath: str, verbose: Verbose = None) -> RoadDB:
     """
     Load and parse a road database file from disk.
 
@@ -36,6 +37,7 @@ def load(filepath: str) -> RoadDB:
 
     Args:
         filepath (str): Path to the rdb file.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         RoadDB: The parsed road database object.
@@ -52,7 +54,7 @@ def load(filepath: str) -> RoadDB:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath) as reader:
+    with BlockReader.open(filepath, verbose=verbose) as reader:
 
         if not reader.filetype == 'T':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a road database?")
@@ -60,7 +62,7 @@ def load(filepath: str) -> RoadDB:
         return read_roaddb(reader)
 
 
-def loads(rdb_text: str) -> RoadDB:
+def loads(rdb_text: str, verbose: Verbose = None) -> RoadDB:
     """
     Parse a road database from a string containing rdb data.
 
@@ -70,6 +72,7 @@ def loads(rdb_text: str) -> RoadDB:
 
     Args:
         rdb_text (str): String containing rdb file data.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         RoadDB: The parsed road database object.
@@ -85,7 +88,7 @@ def loads(rdb_text: str) -> RoadDB:
     if not isinstance(rdb_text, str):
         raise TypeError(f"Parameter 'rdb_text' must be str, but got {type(rdb_text).__name__}")
 
-    reader = BlockReader.from_string(rdb_text)
+    reader = BlockReader.from_string(rdb_text, verbose=verbose)
 
     if not reader.filetype == 'T':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a road database?")

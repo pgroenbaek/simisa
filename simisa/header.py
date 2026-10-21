@@ -45,7 +45,7 @@ def is_utf16le(filepath: str, verbose: Verbose = None) -> Optional[bool]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         True if the file is UTF-16 LE encoded, otherwise False.
@@ -81,7 +81,7 @@ def peek_header(filepath: str, verbose: Verbose = None) -> Optional[str]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         The detected header string if it starts with a valid SIMISA header,
@@ -142,7 +142,7 @@ def is_compressed(filepath: str, verbose: Verbose = None) -> Optional[bool]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         True if the file is compressed,
@@ -193,7 +193,7 @@ def peek_subheader(filepath: str, verbose: Verbose = None) -> Optional[str]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         The decoded subheader string if successfully read and valid,
@@ -270,7 +270,7 @@ def is_binary(filepath: str, verbose: Verbose = None) -> Optional[bool]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         True if the file is identified as binary,
@@ -315,7 +315,7 @@ def is_text(filepath: str, verbose: Verbose = None) -> Optional[bool]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         True if the file is identified as text,
@@ -360,7 +360,7 @@ def read_filetype(filepath: str, verbose: Verbose = None) -> Optional[str]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         A single-character string representing the file type,
@@ -402,7 +402,7 @@ def read_fileversion(filepath: str, verbose: Verbose = None) -> Optional[int]:
 
     Args:
         filepath (str): Path to the file to inspect.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         An integer representing the file version,

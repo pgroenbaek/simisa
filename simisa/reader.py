@@ -202,7 +202,7 @@ class BlockReader(ABC):
 
         Args:
             filepath (str): Path to a SIMISA file on disk.
-            verbose (Verbose, optional): Optional verbosity level.
+            verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:
             BlockReader: Instance of `BinaryFileReader` or `TextFileReader`.
@@ -354,7 +354,7 @@ class BlockReader(ABC):
 
         Args:
             data (str): Raw SIMISA text payload.
-            verbose (Verbose, optional): Optional verbosity level.
+            verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:
             BlockReader: Instance of `TextFileReader` over the provided string data.

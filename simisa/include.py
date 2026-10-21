@@ -140,7 +140,7 @@ def resolve_include(include_path: str, filepath: str, verbose: Verbose = None) -
     Args:
         include_path (str): Path of the include to resolve (relative to `filepath`).
         filepath (str): Base file path used to resolve the include path.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         Fully expanded content of the included file.
@@ -219,7 +219,7 @@ def resolve_includes(text: str, filepath: str, verbose: Verbose = None) -> str:
     Args:
         text: Source text to resolve includes in.
         filepath: Path of the source file the text originated from.
-        verbose (Verbose, optional): Optional verbosity level.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         The full text with all includes resolved.

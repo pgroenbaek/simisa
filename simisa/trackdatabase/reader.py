@@ -24,13 +24,14 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..verbosity import Verbose
 from .models import *
 
 logger = logging.getLogger(__name__)
 
 
 
-def load(filepath: str) -> TrackDB:
+def load(filepath: str, verbose: Verbose = None) -> TrackDB:
     """
     Load and parse a track database file from disk.
 
@@ -39,6 +40,7 @@ def load(filepath: str) -> TrackDB:
 
     Args:
         filepath (str): Path to the tdb file.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         TrackDB: The parsed track database object.
@@ -55,7 +57,7 @@ def load(filepath: str) -> TrackDB:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath) as reader:
+    with BlockReader.open(filepath, verbose=verbose) as reader:
 
         if not reader.filetype == 'T':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a track database?")
@@ -63,7 +65,7 @@ def load(filepath: str) -> TrackDB:
         return read_trackdb(reader)
 
 
-def loads(tdb_text: str) -> TrackDB:
+def loads(tdb_text: str, verbose: Verbose = None) -> TrackDB:
     """
     Parse a track database from a string containing tdb data.
 
@@ -73,6 +75,7 @@ def loads(tdb_text: str) -> TrackDB:
 
     Args:
         tdb_text (str): String containing tdb file data.
+        verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         TrackDB: The parsed track database object.
@@ -88,7 +91,7 @@ def loads(tdb_text: str) -> TrackDB:
     if not isinstance(tdb_text, str):
         raise TypeError(f"Parameter 'tdb_text' must be str, but got {type(tdb_text).__name__}")
 
-    reader = BlockReader.from_string(tdb_text)
+    reader = BlockReader.from_string(tdb_text, verbose=verbose)
 
     if not reader.filetype == 'T':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a track database?")
