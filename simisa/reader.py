@@ -36,7 +36,7 @@ from .include import has_includes, peek_first_include
 from .include import resolve_includes, UnresolvableIncludeError
 from .token_id import TokenID
 from .stf import StfReader
-from .verbose import VerbosityLevel, normalize_verbosity, verbose_print
+from .verbosity import Verbose, normalize_verbosity, verbosity_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ class BlockReader(ABC):
     """
 
     @staticmethod
-    def open(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> "BlockReader":
+    def open(filepath: str, verbose: Verbose = None) -> "BlockReader":
         """
         Open a SIMISA file and construct an appropriate BlockReader.
 
@@ -202,7 +202,7 @@ class BlockReader(ABC):
 
         Args:
             filepath (str): Path to a SIMISA file on disk.
-            verbose: Optional verbosity level.
+            verbose (Verbose, optional): Optional verbosity level.
 
         Returns:
             BlockReader: Instance of `BinaryFileReader` or `TextFileReader`.
@@ -217,21 +217,43 @@ class BlockReader(ABC):
         if not isinstance(filepath, str):
             raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-        vlevel = normalize_verbosity(verbose)
+        verbose = normalize_verbosity(verbose)
+
         compressed = is_compressed(filepath, verbose=verbose)
 
         if compressed is None: # Header unknown, it is either missing, invalid or inside an include.
+            if verbosity_enabled(verbose, logging.INFO):
+                logger.info(
+                    "No valid SIMISA header found in '%s' (compressed=%s), proceeding to check for an include.",
+                    filepath,
+                    compressed
+                )
+            
             first_include_path = peek_first_include(filepath)
 
             if first_include_path is None: # No include was present, therefore the header is missing or invalid.
+                if verbosity_enabled(verbose, logging.INFO):
+                    logger.info(
+                        "No include found include at the start of file '%s', so the header is missing or invalid.",
+                        filepath,
+                        compressed
+                    )
+                
                 raise SimisaHeaderError(f"Unrecognized header in {filepath}")
+
+            if verbosity_enabled(verbose, logging.INFO):
+                logger.info(
+                    "Found an include at the start of file '%s', proceeding to resolve the include tree and check for a header again.",
+                    filepath,
+                    compressed
+                )
 
             # Fallback path, resolve all includes to make sure the header can be found if inside an include.
             # Then use 'from_string' to re-do all checks and return the configured reader if a valid header was then found.
             with open(filepath, "rb") as f:
                 bom = f.read(2)
-                is_unicode = (bom == codecs.BOM_UTF16_LE)
-                encoding = "utf-16-le" if is_unicode else "ascii"
+                has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
+                encoding = "utf-16-le" if has_utf16le_bom else "ascii"
 
                 buffer = f.read()
                 try:
@@ -244,15 +266,21 @@ class BlockReader(ABC):
             return BlockReader.from_string(text, verbose=verbose)
 
         # Found the beginning of a valid header in the file, proceed to read normally.
-        verbose_print("reader", f"Opening SIMISA file '{filepath}' (compressed={compressed})", VerbosityLevel.NORMAL, vlevel)
+        if verbosity_enabled(verbose, logging.INFO):
+            logger.info(
+                "Found a valid SIMISA header in '%s' (compressed=%s), proceeding to read normally.",
+                filepath,
+                compressed
+            )
+
         f = open(filepath, "rb")
 
         try:
             bom = f.read(2)
-            is_unicode = (bom == codecs.BOM_UTF16_LE)
-            encoding = "utf-16-le" if is_unicode else "ascii"
+            has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
+            encoding = "utf-16-le" if has_utf16le_bom else "ascii"
 
-            if is_unicode:
+            if has_utf16le_bom:
                 header_bytes = f.read(32)
                 header = header_bytes[:16].decode(encoding)
             else:
@@ -263,35 +291,52 @@ class BlockReader(ABC):
                 stream = CompressedStreamReader(f)
             else:
                 if header.startswith("\r\n"):
-                    f.read(4 if is_unicode else 2)
+                    f.read(4 if has_utf16le_bom else 2)
                 stream = f
 
-            subheader_bytes = stream.read(32 if is_unicode else 16)
-            subheader = subheader_bytes[:16 if is_unicode else 8].decode(encoding, errors="ignore")
+            subheader_bytes = stream.read(32 if has_utf16le_bom else 16)
+            subheader = subheader_bytes[:16 if has_utf16le_bom else 8].decode(encoding, errors="ignore")
 
             if len(subheader) < 8:
                 raise SimisaSubheaderError(f"Subheader '{subheader}' too short in {filepath}")
+
+            if verbosity_enabled(verbose, logging.INFO):
+                logger.info(
+                    "File '%s' header read (header='%s', subheader='%s')",
+                    filepath,
+                    header,
+                    subheader
+                )
 
             filetype = subheader[5]
             fileversion = int(subheader[6])
             fileformat = subheader[7]
 
-            verbose_print(
-                "reader",
-                f"File '{filepath}' initialized: header='{header[:8]}', subheader='{subheader[:8]}', "
-                f"filetype='{filetype}', fileversion={fileversion}, format='{'binary' if fileformat == 'b' else 'text'}'",
-                VerbosityLevel.NORMAL,
-                vlevel
-            )
-
             if fileformat == "b":
                 token_offset = 300 if filetype == "w" else 0
+
+                if verbosity_enabled(verbose, logging.INFO):
+                    logger.info(
+                        "Creating binary reader with config (filetype='%s', fileversion='%s', token_offset=%d)",
+                        filetype,
+                        fileversion,
+                        token_offset,
+                    )
+                
                 return BinaryFileReader(stream, filepath, filetype, fileversion, token_offset, verbose=verbose)
 
             if fileformat != "t":
                 raise SimisaSubheaderError(f"Unrecognized subheader '{subheader}' in {filepath}")
 
             text_stream = io.TextIOWrapper(stream, encoding=encoding)
+
+            if verbosity_enabled(verbose, logging.INFO):
+                logger.info(
+                    "Creating text reader with config (filetype='%s', fileversion='%s', encoding='%s')",
+                    filetype,
+                    fileversion,
+                    encoding,
+                )
 
             return TextFileReader(text_stream, filepath, filetype, fileversion, encoding, verbose=verbose)
 
@@ -300,7 +345,7 @@ class BlockReader(ABC):
             raise
 
     @staticmethod
-    def from_string(data: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> "BlockReader":
+    def from_string(data: str, verbose: Verbose = None) -> "BlockReader":
         """
         Construct a BlockReader from in-memory SIMISA text data.
 
@@ -309,7 +354,7 @@ class BlockReader(ABC):
 
         Args:
             data (str): Raw SIMISA text payload.
-            verbose: Optional verbosity level.
+            verbose (Verbose, optional): Optional verbosity level.
 
         Returns:
             BlockReader: Instance of `TextFileReader` over the provided string data.
@@ -323,7 +368,8 @@ class BlockReader(ABC):
         if not isinstance(data, str):
             raise TypeError(f"Parameter 'data' must be str, but got {type(data).__name__}")
 
-        vlevel = normalize_verbosity(verbose)
+        verbose = normalize_verbosity(verbose)
+
         data = data.lstrip("\ufeff\r\n\t ")
 
         if has_includes(data):
@@ -357,13 +403,13 @@ class BlockReader(ABC):
         if fileformat != "t":
             raise SimisaSubheaderError(f"Unrecognized subheader '{subheader}' in string input")
 
-        verbose_print(
-            "reader",
-            f"String reader initialized: header='{header[:8]}', subheader='{subheader[:8]}', "
-            f"filetype='{filetype}', fileversion={fileversion}",
-            VerbosityLevel.NORMAL,
-            vlevel
-        )
+        if verbosity_enabled(verbose, logging.INFO):
+            logger.info(
+                "Creating text reader with config (filetype='%s', fileversion='%s', encoding='utf-8')",
+                filetype,
+                fileversion,
+            )
+        
         return TextFileReader(stream, "<string>", filetype, fileversion, "utf-8", verbose=verbose)
 
     def __iter__(self) -> Iterator["BlockReader"]:
@@ -537,14 +583,14 @@ class TextBlockReader(BlockReader):
         for name, token in TokenID.__members__.items()
     }
 
-    def __init__(self, verbose: Union[bool, int, VerbosityLevel, None] = None):
+    def __init__(self, verbose: Verbose = None):
         self.stf_reader: Optional[StfReader] = None
         self.id: Optional[TokenID] = None
         self.label: Optional[str] = None
         self.start_depth: int = 0
         self.at_end_of_block: bool = False
         self.is_closed: bool = False
-        self.verbosity: VerbosityLevel = normalize_verbosity(verbose)
+        self.verbose: Optional[int] = normalize_verbosity(verbose)
 
     def _get_token_id(self, token: str) -> TokenID:
         t = token.lower()
@@ -555,10 +601,11 @@ class TextBlockReader(BlockReader):
             return token_id
 
         logger.warning(f"Skipped unknown token {token}")
+
         return TokenID.comment
 
     def read_sub_block(self) -> Optional[BlockReader]:
-        sub_block = TextBlockReader(verbose=self.verbosity)
+        sub_block = TextBlockReader(verbose=self.verbose)
         sub_block.stf_reader = self.stf_reader
 
         token = self.stf_reader.read_item()
@@ -585,32 +632,54 @@ class TextBlockReader(BlockReader):
 
         if token != '(':
             sub_block.label = token
+
             token = self.stf_reader.read_item()
+
             if token != '(':
                 raise BlockReaderError(f"Expected '(' after label, but got '{token}'")
 
         sub_block.start_depth = self.stf_reader.depth
-        verbose_print(
-            "block",
-            f"Reading text block: '{sub_block.id.name}' (id: {sub_block.id.value}, label: {sub_block.label})",
-            VerbosityLevel.NORMAL,
-            self.verbosity
-        )
+
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Reading text block: '%s' (id: %d, label: %s)",
+                sub_block.id.name,
+                sub_block.id.value,
+                sub_block.label,
+            )
+
         return sub_block
 
     def skip(self):
         if self.at_end_of_block:
             return
 
-        verbose_print("read", f"Skipping text block '{self.id.name if self.id else '<unknown>'}'", VerbosityLevel.DETAILED, self.verbosity)
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Skipping remaining data in text block '%s'",
+                self.id.name if self.id else '<unknown>',
+            )
+
+        skipped_tokens = []
+
         while not self.end_of_block():
             token = self.stf_reader.read_item()
 
-            if token == '':
+            if token == "":
                 logger.warning("Unexpected end of file")
+
                 self.at_end_of_block = True
                 return
 
+            skipped_tokens.append(token)
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug(
+                "Skipped data in text block '%s': %r",
+                self.id.name if self.id else "<unknown>",
+                skipped_tokens,
+            )
+        
         self.at_end_of_block = True
 
     def end_of_block(self) -> bool:
@@ -636,37 +705,58 @@ class TextBlockReader(BlockReader):
         if next_token == ')':
             self.stf_reader.read_item()
 
-        verbose_print("block", f"Verified end of text block '{self.id.name if self.id else '<root>'}'", VerbosityLevel.DETAILED, self.verbosity)
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Verified end of text block '%s'",
+                {self.id.name if self.id else '<root>'},
+            )
 
     def read_flags(self) -> int:
-        val = self.stf_reader.read_hex(None)
-        verbose_print("read", f"Read flags: 0x{val:X}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self.stf_reader.read_hex(None)
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read flags: 0x%X", value)
+        
+        return value
 
     def read_int(self) -> int:
-        val = self.stf_reader.read_int(None)
-        verbose_print("read", f"Read int: {val}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self.stf_reader.read_int(None)
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read int: %d", value)
+        
+        return value
 
     def read_uint(self) -> int:
-        val = self.stf_reader.read_uint(None)
-        verbose_print("read", f"Read uint: {val}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self.stf_reader.read_uint(None)
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read uint: %d", value)
+
+        return value
 
     def read_float(self) -> float:
-        val = self.stf_reader.read_float(None)
-        verbose_print("read", f"Read float: {val}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self.stf_reader.read_float(None)
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read float: %s", value)
+
+        return value
 
     def read_string(self) -> str:
-        val = self.stf_reader.read_item()
-        verbose_print("read", f"Read string: '{val}'", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self.stf_reader.read_item()
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read string: %r", value)
+
+        return value
 
     def close(self):
         if not self.is_closed:
+
             if self.stf_reader:
                 self.stf_reader.close()
+            
             self.is_closed = True
 
 
@@ -679,7 +769,7 @@ class TextFileReader(TextBlockReader):
         filetype: str,
         fileversion: int,
         encoding: str,
-        verbose: Union[bool, int, VerbosityLevel, None] = None
+        verbose: Verbose = None
     ):
         super().__init__(verbose=verbose)
         self.filepath = filepath
@@ -689,7 +779,7 @@ class TextFileReader(TextBlockReader):
         self.stream = stream
         self.is_closed = False
         self.at_end_of_block = False
-        self.stf_reader = StfReader.from_stream(stream, filepath, verbose=self.verbosity)
+        self.stf_reader = StfReader.from_stream(stream, filepath, verbose=self.verbose)
 
     def skip(self):
         if self.is_closed:
@@ -712,6 +802,12 @@ class TextFileReader(TextBlockReader):
                     return
 
                 token = self.stf_reader.read_item()
+        
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Verified end of text block '%s'",
+                {self.id.name if self.id else '<root>'},
+            )
 
     def end_of_block(self) -> bool:
         if self.is_closed or self.at_end_of_block:
@@ -721,8 +817,10 @@ class TextFileReader(TextBlockReader):
 
     def close(self):
         if not self.is_closed:
+
             if self.stf_reader:
                 self.stf_reader.close()
+            
             self.is_closed = True
 
 
@@ -733,7 +831,7 @@ class BinaryBlockReader(BlockReader):
     _FLOAT32 = struct.Struct("<f")
     _BLOCK_HEADER = struct.Struct("<HHI")
 
-    def __init__(self, verbose: Union[bool, int, VerbosityLevel, None] = None):
+    def __init__(self, verbose: Verbose = None):
         self.filepath: str = ""
         self.stream: Optional[BinaryIO] = None
         self.token_offset: int = 0
@@ -742,7 +840,7 @@ class BinaryBlockReader(BlockReader):
         self.flags: int = 0
         self.label: Optional[str] = None
         self._buffer: Optional[bytes] = None
-        self.verbosity: VerbosityLevel = normalize_verbosity(verbose)
+        self.verbose: Optional[int] = normalize_verbosity(verbose)
 
     def _read(self, num_bytes: int) -> bytes:
         if self.stream is None:
@@ -775,7 +873,7 @@ class BinaryBlockReader(BlockReader):
 
         raw_id, raw_flags, size = self._BLOCK_HEADER.unpack(self._read(8))
 
-        sub_block = BinaryBlockReader(verbose=self.verbosity)
+        sub_block = BinaryBlockReader(verbose=self.verbose)
         sub_block.stream = self.stream
         sub_block.filepath = self.filepath
         sub_block.token_offset = self.token_offset
@@ -803,44 +901,63 @@ class BinaryBlockReader(BlockReader):
                 raw_label = sub_block._read(label_length * 2)
                 sub_block.label = raw_label.decode("utf-16-le")
 
-        verbose_print(
-            "block",
-            f"Reading binary block: '{sub_block.id.name}' (id: {token_id}, size: {size}, flags: 0x{raw_flags:04X}, label: {sub_block.label})",
-            VerbosityLevel.NORMAL,
-            self.verbosity
-        )
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Reading binary block: '%s' (id: %d, size: %d, flags: 0x%04X, label: %s)",
+                sub_block.id.name,
+                sub_block.id.value,
+                size,
+                raw_flags,
+                sub_block.label,
+            )
+
         return sub_block
 
     def read_flags(self) -> int:
-        val = self._UINT32.unpack(self._read(4))[0]
-        verbose_print("read", f"Read flags: 0x{val:X}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self._UINT32.unpack(self._read(4))[0]
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read flags: 0x%X", value)
+        
+        return value
 
     def read_int(self) -> int:
-        val = self._INT32.unpack(self._read(4))[0]
-        verbose_print("read", f"Read int: {val}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self._INT32.unpack(self._read(4))[0]
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read int: %d", value)
+        
+        return value
 
     def read_uint(self) -> int:
-        val = self._UINT32.unpack(self._read(4))[0]
-        verbose_print("read", f"Read uint: {val}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self._UINT32.unpack(self._read(4))[0]
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read uint: %d", value)
+        
+        return value
 
     def read_float(self) -> float:
-        val = self._FLOAT32.unpack(self._read(4))[0]
-        verbose_print("read", f"Read float: {val}", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+        value = self._FLOAT32.unpack(self._read(4))[0]
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read float: %s", value)
+        
+        return value
 
     def read_string(self) -> str:
         length = self._UINT16.unpack(self._read(2))[0]
 
         if length == 0:
-            val = ""
+            value = ""
         else:
             raw_string = self._read(length * 2)
-            val = raw_string.decode("utf-16-le")
-        verbose_print("read", f"Read string: '{val}'", VerbosityLevel.DEBUG, self.verbosity)
-        return val
+            value = raw_string.decode("utf-16-le")
+
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read string: %r", value)
+
+        return value
     
     def skip(self):
         if self.remaining_bytes <= 0:
@@ -849,14 +966,22 @@ class BinaryBlockReader(BlockReader):
         if self.stream is None:
             return
 
-        verbose_print("read", f"Skipping binary block '{self.id.name if self.id else '<unknown>'}' ({self.remaining_bytes} bytes)", VerbosityLevel.DETAILED, self.verbosity)
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Skipping remaining data in binary block '%s' (%d bytes)",
+                self.id.name if self.id else "<unknown>",
+                self.remaining_bytes,
+            )
+
         skipped_bytes = self.stream.read(self.remaining_bytes)
 
-        if self.remaining_bytes <= 1000:
-            logger.warning(f"Skipped data: {skipped_bytes.hex().upper()}")
-        else:
-            logger.warning(f"Length of skipped data: {len(skipped_bytes)}")
-
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug(
+                "Skipped data in binary block '%s': %s",
+                self.id.name if self.id else "<unknown>",
+                skipped_bytes.hex().upper(),
+            )
+        
         self.remaining_bytes = 0
 
     def end_of_block(self) -> bool:
@@ -869,7 +994,12 @@ class BinaryBlockReader(BlockReader):
                 f"but got extra data"
             )
             self.skip()
-        verbose_print("block", f"Verified end of binary block '{self.id.name if self.id else '<root>'}'", VerbosityLevel.DETAILED, self.verbosity)
+
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Verified end of binary block '%s'",
+                {self.id.name if self.id else '<root>'},
+            )
 
     def close(self):
         if self.stream:
@@ -886,7 +1016,7 @@ class BinaryFileReader(BinaryBlockReader):
         filetype: str,
         fileversion: int,
         token_offset: int,
-        verbose: Union[bool, int, VerbosityLevel, None] = None
+        verbose: Verbose = None
     ):
         super().__init__(verbose=verbose)
         self.filepath = filepath
@@ -922,6 +1052,12 @@ class BinaryFileReader(BinaryBlockReader):
         if not self.end_of_block():
             logger.warning(
                 f"Expected end of file, but got extra data in {self.filepath}"
+            )
+
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "Verified end of binary block '%s'",
+                {self.id.name if self.id else '<root>'},
             )
 
     def close(self):

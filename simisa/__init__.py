@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-__version__ = '0.1.0b0'
+__version__ = '0.1.0b2'
 __all__ = [
     'is_unicode', 'peek_header', 'peek_subheader',
     'is_compressed', 'is_binary', 'is_text',
@@ -31,10 +31,7 @@ __all__ = [
     'TokenID', 'Units', 'StfReader',
     'BlockReader', 'BlockWriter', 'BlockFormat',
     'BlockReaderError', 'BlockWriterError',
-    'StfReaderError',
-    'VerbosityLevel', 'normalize_verbosity', 'get_global_verbosity',
-    'set_global_verbosity', 'set_verbose_output',
-    'verbose_print',
+    'StfReaderError', 'Verbose',
     'roaddatabase', 'rdb',
     'shape', 's', 'terrain', 't',
     'tracksections', 'tsection',
@@ -57,11 +54,7 @@ from .stf import StfReader, StfReaderError
 from .reader import BlockReader, BlockReaderError
 from .writer import BlockWriter, BlockWriterError
 from .format import BlockFormat
-from .verbose import (
-    VerbosityLevel, normalize_verbosity, get_global_verbosity,
-    set_global_verbosity, set_verbose_output,
-    verbose_print
-)
+from .verbosity import Verbose
 
 from . import roaddatabase
 from . import roaddatabase as rdb

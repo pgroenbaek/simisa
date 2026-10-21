@@ -72,7 +72,7 @@ def dump(
         filetype="w",
         fileversion=0,
         is_binary=binary,
-        is_unicode=not ascii and not binary and not compressed,
+        is_utf16le=not ascii and not binary and not compressed,
         is_compressed=compressed
     ) as writer:
         write_world(writer, world)

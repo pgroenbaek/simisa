@@ -18,10 +18,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import codecs
+import logging
 from typing import Optional, Union
 
-from .verbose import VerbosityLevel, normalize_verbosity, verbose_print
+from .verbosity import Verbose, normalize_verbosity, verbosity_enabled
 
+logger = logging.getLogger(__name__)
 
 
 class SimisaHeaderError(Exception):
@@ -34,7 +36,7 @@ class SimisaSubheaderError(Exception):
     pass
 
 
-def is_unicode(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[bool]:
+def is_unicode(filepath: str, verbose: Verbose = None) -> Optional[bool]:
     """
     Checks whether a file is encoded in UTF-16 LE based on its BOM.
 
@@ -42,24 +44,34 @@ def is_unicode(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = 
     whether they match the UTF-16 LE byte order mark.
 
     Args:
-        filepath: Path to the file to inspect.
-        verbose: Optional verbosity level.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         True if the file is UTF-16 LE encoded, otherwise False.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
-    
-    vlevel = normalize_verbosity(verbose)
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
+
+    verbose = normalize_verbosity(verbose)
+
     with open(filepath, "rb") as f:
         bom = f.read(2)
-        unicode_flag = (bom == codecs.BOM_UTF16_LE)
-        verbose_print("header", f"File '{filepath}' is_unicode={unicode_flag}", VerbosityLevel.DEBUG, vlevel)
-        return unicode_flag
+        has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
+
+        if verbosity_enabled(verbose, logging.DEBUG):
+            logger.debug(
+                "File '%s' (has_utf16le_bom=%s)",
+                filepath,
+                has_utf16le_bom,
+            )
+
+        return has_utf16le_bom
 
 
-def peek_header(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[str]:
+def peek_header(filepath: str, verbose: Verbose = None) -> Optional[str]:
     """
     Reads the beginning of a file and extracts the SIMISA header if present.
 
@@ -68,22 +80,25 @@ def peek_header(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] =
     the resulting text starts with a known valid SIMISA header.
 
     Args:
-        filepath: Path to the file to inspect.
-        verbose: Optional verbosity level.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         The detected header string if it starts with a valid SIMISA header,
         otherwise None.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
     
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     with open(filepath, "rb") as f:
         bom = f.read(2)
-        is_uni = (bom == codecs.BOM_UTF16_LE)
+        has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
 
-        if is_uni:
+        if has_utf16le_bom:
             buffer = f.read(32)
             header = buffer.decode("utf-16-le")
         else:
@@ -98,14 +113,27 @@ def peek_header(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] =
         ]
 
         if not any(header.startswith(h) for h in valid_headers):
-            verbose_print("header", f"No valid SIMISA header in '{filepath}'", VerbosityLevel.DEBUG, vlevel)
+            if verbosity_enabled(verbose, logging.DEBUG):
+                logger.debug(
+                    "No valid SIMISA header in '%s', got '%s'",
+                    filepath,
+                    header,
+                )
+            
             return None
         
-        verbose_print("header", f"Header in '{filepath}': '{header[:8]}' (unicode={is_uni})", VerbosityLevel.NORMAL, vlevel)
+        if verbosity_enabled(verbose, logging.INFO):
+            logger.info(
+                "Header in '%s': '%s' (has_utf16le_bom=%s)",
+                filepath,
+                header[:8],
+                has_utf16le_bom,
+            )
+        
         return header
 
 
-def is_compressed(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[bool]:
+def is_compressed(filepath: str, verbose: Verbose = None) -> Optional[bool]:
     """
     Determines whether a file is compressed based on its SIMISA header.
 
@@ -113,8 +141,8 @@ def is_compressed(filepath: str, verbose: Union[bool, int, VerbosityLevel, None]
     compression from known SIMISA header markers.
 
     Args:
-        filepath: Path to the file to inspect.
-        verbose: Optional verbosity level.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         True if the file is compressed,
@@ -122,26 +150,39 @@ def is_compressed(filepath: str, verbose: Union[bool, int, VerbosityLevel, None]
         None if the header is missing or unrecognized.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
     
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     header = peek_header(filepath, verbose=verbose)
 
     if header is None:
         return None
 
     elif header.startswith("SIMISA@F"):
-        verbose_print("header", f"File '{filepath}' is compressed (SIMISA@F)", VerbosityLevel.NORMAL, vlevel)
+        if verbosity_enabled(verbose, logging.INFO):
+            logger.info(
+                "File '%s' is compressed (SIMISA@F)",
+                filepath,
+            )
+        
         return True
 
     elif header.startswith("SIMISA@@"):
-        verbose_print("header", f"File '{filepath}' is uncompressed (SIMISA@@)", VerbosityLevel.NORMAL, vlevel)
+        if verbosity_enabled(verbose, logging.INFO):
+            logger.info(
+                "File '%s' is uncompressed (SIMISA@@)",
+                filepath,
+            )
+        
         return False
 
     return None
 
 
-def peek_subheader(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[str]:
+def peek_subheader(filepath: str, verbose: Verbose = None) -> Optional[str]:
     """
     Reads and extracts a SIMISA subheader from a file.
 
@@ -151,16 +192,20 @@ def peek_subheader(filepath: str, verbose: Union[bool, int, VerbosityLevel, None
     it reads directly from the file stream, accounting for potential newline prefixes.
 
     Args:
-        filepath: Path to the file to inspect.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         The decoded subheader string if successfully read and valid,
         otherwise None.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
     
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     compressed = is_compressed(filepath, verbose=verbose)
 
     if compressed is None:
@@ -168,10 +213,10 @@ def peek_subheader(filepath: str, verbose: Union[bool, int, VerbosityLevel, None
 
     with open(filepath, "rb") as f:
         bom = f.read(2)
-        is_unicode_flag = (bom == codecs.BOM_UTF16_LE)
-        encoding = "utf-16-le" if is_unicode_flag else "ascii"
+        has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
+        encoding = "utf-16-le" if has_utf16le_bom else "ascii"
 
-        if is_unicode_flag:
+        if has_utf16le_bom:
             header_bytes = f.read(32)
             header = header_bytes[:16].decode(encoding)
         else:
@@ -183,23 +228,32 @@ def peek_subheader(filepath: str, verbose: Union[bool, int, VerbosityLevel, None
             stream = CompressedStreamReader(f)
         else:
             if header.startswith("\r\n"):
-                f.read(4 if is_unicode_flag else 2)
+                f.read(4 if has_utf16le_bom else 2)
             stream = f
 
         try:
-            subheader_bytes = stream.read(32 if is_unicode_flag else 16)
-            subheader = subheader_bytes[:16 if is_unicode_flag else 8].decode(encoding, errors="ignore")
+            subheader_bytes = stream.read(32 if has_utf16le_bom else 16)
+            subheader = subheader_bytes[:16 if has_utf16le_bom else 8].decode(encoding, errors="ignore")
 
             if len(subheader) < 8:
-                verbose_print("header", f"Subheader in '{filepath}' too short (<8 bytes)", VerbosityLevel.DEBUG, vlevel)
+                if verbosity_enabled(verbose, logging.DEBUG):
+                    logger.debug(
+                        "Subheader in '%s' too short (<8 bytes)",
+                        filepath,
+                    )
+                
                 return None
 
-            verbose_print(
-                "header",
-                f"Subheader in '{filepath}': '{subheader[:8]}' (type='{subheader[5]}', ver={subheader[6]}, fmt='{subheader[7]}')",
-                VerbosityLevel.NORMAL,
-                vlevel
-            )
+            if verbosity_enabled(verbose, logging.INFO):
+                logger.info(
+                    "Subheader in '%s': '%s' (filetype='%s', fileversion=%s, fileformat='%s')",
+                    filepath,
+                    subheader[:8],
+                    subheader[5],
+                    subheader[6],
+                    subheader[7],
+                )
+            
             return subheader
             
         finally:
@@ -207,7 +261,7 @@ def peek_subheader(filepath: str, verbose: Union[bool, int, VerbosityLevel, None
                 stream.close()
 
 
-def is_binary(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[bool]:
+def is_binary(filepath: str, verbose: Verbose = None) -> Optional[bool]:
     """
     Determines whether a file is in binary format based on its SIMISA subheader.
 
@@ -215,8 +269,8 @@ def is_binary(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = N
     the format indicator character to determine if the file is binary.
 
     Args:
-        filepath: Path to the file to inspect.
-        verbose: Optional verbosity level.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         True if the file is identified as binary,
@@ -224,9 +278,12 @@ def is_binary(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = N
         None if the subheader is missing or invalid.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
     
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     subheader = peek_subheader(filepath, verbose=verbose)
 
     if subheader is None:
@@ -236,12 +293,20 @@ def is_binary(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = N
         return None
 
     fileformat = subheader[7]
-    result = (fileformat == "b")
-    verbose_print("header", f"File '{filepath}' is_binary={result}", VerbosityLevel.DEBUG, vlevel)
-    return result
+
+    is_binary_format = (fileformat == "b")
+
+    if verbosity_enabled(verbose, logging.DEBUG):
+        logger.debug(
+            "File '%s' (is_binary_format=%s)",
+            filepath,
+            is_binary_format
+        )
+        
+    return is_binary_format
 
 
-def is_text(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[bool]:
+def is_text(filepath: str, verbose: Verbose = None) -> Optional[bool]:
     """
     Determines whether a file is in text format based on its SIMISA subheader.
 
@@ -249,8 +314,8 @@ def is_text(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = Non
     the format indicator character to determine if the file is text-based.
 
     Args:
-        filepath: Path to the file to inspect.
-        verbose: Optional verbosity level.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         True if the file is identified as text,
@@ -258,9 +323,12 @@ def is_text(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = Non
         None if the subheader is missing or invalid.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
     
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     subheader = peek_subheader(filepath, verbose=verbose)
 
     if subheader is None:
@@ -270,12 +338,20 @@ def is_text(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = Non
         return None
 
     fileformat = subheader[7]
-    result = (fileformat == "t")
-    verbose_print("header", f"File '{filepath}' is_text={result}", VerbosityLevel.DEBUG, vlevel)
-    return result
+
+    is_text_format = (fileformat == "t")
+
+    if verbosity_enabled(verbose, logging.DEBUG):
+        logger.debug(
+            "File '%s' (is_text_format=%s)",
+            filepath,
+            is_text_format
+        )
+        
+    return is_text_format
 
 
-def read_filetype(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[str]:
+def read_filetype(filepath: str, verbose: Verbose = None) -> Optional[str]:
     """
     Extracts the file type identifier from a SIMISA file subheader.
 
@@ -283,17 +359,20 @@ def read_filetype(filepath: str, verbose: Union[bool, int, VerbosityLevel, None]
     the character representing the file type.
 
     Args:
-        filepath: Path to the file to inspect.
-        verbose: Optional verbosity level.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         A single-character string representing the file type,
         or None if the subheader is missing or invalid.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
     
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     subheader = peek_subheader(filepath, verbose=verbose)
 
     if subheader is None:
@@ -302,12 +381,19 @@ def read_filetype(filepath: str, verbose: Union[bool, int, VerbosityLevel, None]
     if len(subheader) < 8:
         return None
 
-    ftype = subheader[5]
-    verbose_print("header", f"File '{filepath}' filetype='{ftype}'", VerbosityLevel.DEBUG, vlevel)
-    return ftype
+    filetype = subheader[5]
+
+    if verbosity_enabled(verbose, logging.DEBUG):
+        logger.debug(
+            "File '%s' (filetype=%s)",
+            filepath,
+            filetype
+        )
+    
+    return filetype
 
 
-def read_fileversion(filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> Optional[int]:
+def read_fileversion(filepath: str, verbose: Verbose = None) -> Optional[int]:
     """
     Extracts the file version number from a SIMISA file subheader.
 
@@ -315,17 +401,20 @@ def read_fileversion(filepath: str, verbose: Union[bool, int, VerbosityLevel, No
     the version character as an integer.
 
     Args:
-        filepath: Path to the file to inspect.
-        verbose: Optional verbosity level.
+        filepath (str): Path to the file to inspect.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         An integer representing the file version,
         or None if the subheader is missing, invalid, or cannot be parsed.
     """
     if not isinstance(filepath, str):
-        raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
+        raise TypeError(
+            f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
+        )
 
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     subheader = peek_subheader(filepath, verbose=verbose)
 
     if subheader is None:
@@ -334,6 +423,13 @@ def read_fileversion(filepath: str, verbose: Union[bool, int, VerbosityLevel, No
     if len(subheader) < 8:
         return None
 
-    ver = int(subheader[6])
-    verbose_print("header", f"File '{filepath}' fileversion={ver}", VerbosityLevel.DEBUG, vlevel)
-    return ver
+    fileversion = int(subheader[6])
+
+    if verbosity_enabled(verbose, logging.DEBUG):
+        logger.debug(
+            "File '%s' (fileversion=%s)",
+            filepath,
+            fileversion
+        )
+    
+    return fileversion

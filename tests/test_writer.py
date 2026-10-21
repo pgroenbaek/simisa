@@ -43,7 +43,7 @@ def open_writer(
     tmp_path,
     *,
     is_binary=False,
-    is_unicode=True,
+    is_utf16le=True,
     is_compressed=False,
     filetype="s",
     fileversion=1,
@@ -55,7 +55,7 @@ def open_writer(
         filetype=filetype,
         fileversion=fileversion,
         is_binary=is_binary,
-        is_unicode=is_unicode,
+        is_utf16le=is_utf16le,
         is_compressed=is_compressed,
     )
 
@@ -130,14 +130,14 @@ def test_open_selects_writer_by_format(tmp_path, is_binary, expected_class):
         writer.close()
 
 
-@pytest.mark.parametrize("is_unicode", [True, False])
-def test_open_writes_header_in_selected_encoding(tmp_path, is_unicode):
-    path, writer = open_writer(tmp_path, is_unicode=is_unicode)
+@pytest.mark.parametrize("is_utf16le", [True, False])
+def test_open_writes_header_in_selected_encoding(tmp_path, is_utf16le):
+    path, writer = open_writer(tmp_path, is_utf16le=is_utf16le)
     writer.close()
 
     data = path.read_bytes()
 
-    if is_unicode:
+    if is_utf16le:
         assert data.startswith(codecs.BOM_UTF16_LE)
         assert "SIMISA@@@@@@@@@@".encode("utf-16-le") in data
     else:
@@ -145,7 +145,7 @@ def test_open_writes_header_in_selected_encoding(tmp_path, is_unicode):
 
 
 @pytest.mark.parametrize(
-    ("is_binary", "is_unicode", "expected_class"),
+    ("is_binary", "is_utf16le", "expected_class"),
     [
         (False, False, TextFileWriter),
         (False, True, TextFileWriter),
@@ -153,11 +153,11 @@ def test_open_writes_header_in_selected_encoding(tmp_path, is_unicode):
         (True, True, BinaryFileWriter),
     ],
 )
-def test_encoding_and_format_options_are_independent(tmp_path, is_binary, is_unicode, expected_class):
+def test_encoding_and_format_options_are_independent(tmp_path, is_binary, is_utf16le, expected_class):
     _, writer = open_writer(
         tmp_path,
         is_binary=is_binary,
-        is_unicode=is_unicode,
+        is_utf16le=is_utf16le,
     )
 
     try:
@@ -177,7 +177,7 @@ def test_encoding_and_format_options_are_independent(tmp_path, is_binary, is_uni
         ("fileversion", None),
         ("fileversion", "1"),
         ("is_binary", 1),
-        ("is_unicode", "true"),
+        ("is_utf16le", "true"),
         ("is_compressed", 0),
     ],
 )
@@ -187,7 +187,7 @@ def test_open_rejects_invalid_parameter_types(tmp_path, parameter, value):
         "filetype": "s",
         "fileversion": 1,
         "is_binary": False,
-        "is_unicode": True,
+        "is_utf16le": True,
         "is_compressed": False,
     }
     kwargs[parameter] = value
@@ -281,7 +281,7 @@ def test_to_string_propagates_callback_exception():
 
 
 @pytest.mark.parametrize(
-    ("is_binary", "is_unicode"),
+    ("is_binary", "is_utf16le"),
     [
         (False, False),
         (False, True),
@@ -289,11 +289,11 @@ def test_to_string_propagates_callback_exception():
         (True, True),
     ],
 )
-def test_write_supported_values(tmp_path, is_binary, is_unicode):
+def test_write_supported_values(tmp_path, is_binary, is_utf16le):
     path, writer = open_writer(
         tmp_path,
         is_binary=is_binary,
-        is_unicode=is_unicode,
+        is_utf16le=is_utf16le,
     )
 
     try:
@@ -365,7 +365,7 @@ def test_write_rejects_out_of_range_integers(tmp_path, method_name, invalid_valu
 
 
 @pytest.mark.parametrize(
-    ("is_binary", "is_unicode"),
+    ("is_binary", "is_utf16le"),
     [
         (False, False),
         (False, True),
@@ -373,11 +373,11 @@ def test_write_rejects_out_of_range_integers(tmp_path, method_name, invalid_valu
         (True, True),
     ],
 )
-def test_compressed_output_is_created(tmp_path, is_binary, is_unicode):
+def test_compressed_output_is_created(tmp_path, is_binary, is_utf16le):
     path, writer = open_writer(
         tmp_path,
         is_binary=is_binary,
-        is_unicode=is_unicode,
+        is_utf16le=is_utf16le,
         is_compressed=True,
     )
 
@@ -398,7 +398,7 @@ def test_compressed_output_is_created(tmp_path, is_binary, is_unicode):
 def test_uncompressed_output_does_not_use_compressed_header(tmp_path):
     path, writer = open_writer(
         tmp_path,
-        is_unicode=False,
+        is_utf16le=False,
         is_compressed=False,
     )
     writer.write_string("payload")
@@ -411,12 +411,12 @@ def test_uncompressed_output_does_not_use_compressed_header(tmp_path):
 
 
 @pytest.mark.parametrize("is_binary", [False, True])
-@pytest.mark.parametrize("is_unicode", [False, True])
-def test_compressed_stream_contains_written_data(tmp_path, is_binary, is_unicode):
+@pytest.mark.parametrize("is_utf16le", [False, True])
+def test_compressed_stream_contains_written_data(tmp_path, is_binary, is_utf16le):
     path, writer = open_writer(
         tmp_path,
         is_binary=is_binary,
-        is_unicode=is_unicode,
+        is_utf16le=is_utf16le,
         is_compressed=True,
     )
 
@@ -438,7 +438,7 @@ def test_compressed_stream_contains_written_data(tmp_path, is_binary, is_unicode
 #         tmp_path,
 #         is_binary=is_binary,
 #         is_compressed=True,
-#         is_unicode=False,
+#         is_utf16le=False,
 #     )
 
 #     try:

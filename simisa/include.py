@@ -20,10 +20,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import os
 import re
 import codecs
+import logging
 from typing import Optional, Union
 
-from .verbose import VerbosityLevel, normalize_verbosity, verbose_print
+from .verbosity import Verbose, normalize_verbosity, verbosity_enabled
 
+logger = logging.getLogger(__name__)
 
 
 class UnresolvableIncludeError(Exception):
@@ -36,7 +38,7 @@ def has_includes(text: str) -> bool:
     Determines whether text contains any include statements.
 
     Args:
-        text: Text to inspect.
+        text (str): Text to inspect.
 
     Returns:
         True if the text contains include statements,
@@ -67,7 +69,7 @@ def peek_first_include(filepath: str) -> Optional[str]:
     or no valid include is found, None is returned.
 
     Args:
-        filepath: Path to the file to inspect.
+        filepath (str): Path to the file to inspect.
 
     Returns:
         The first include path if present, otherwise None.
@@ -79,8 +81,8 @@ def peek_first_include(filepath: str) -> Optional[str]:
 
     with open(filepath, "rb") as f:
         bom = f.read(2)
-        is_unicode = (bom == codecs.BOM_UTF16_LE)
-        encoding = "utf-16-le" if is_unicode else "ascii"
+        has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
+        encoding = "utf-16-le" if has_utf16le_bom else "ascii"
 
         # Assumption: First include is within the first 2kB of the file
         # This might not be true if there is a very long comment beforehand.
@@ -130,15 +132,15 @@ def peek_first_include(filepath: str) -> Optional[str]:
     return include_match.group(2)
 
 
-def resolve_include(include_path: str, filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> str:
+def resolve_include(include_path: str, filepath: str, verbose: Verbose = None) -> str:
     """
     Resolves a single include (by path relative to `filepath`)
     and returns its fully expanded content (including nested includes).
 
     Args:
-        include_path: Path of the include to resolve (relative to `filepath`).
-        filepath: Base file path used to resolve the include path.
-        verbose: Optional verbosity level.
+        include_path (str): Path of the include to resolve (relative to `filepath`).
+        filepath (str): Base file path used to resolve the include path.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         Fully expanded content of the included file.
@@ -156,9 +158,15 @@ def resolve_include(include_path: str, filepath: str, verbose: Union[bool, int, 
             f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
         )
 
-    vlevel = normalize_verbosity(verbose)
-    verbose_print("include", f"Resolving include '{include_path}' relative to '{filepath}'", VerbosityLevel.NORMAL, vlevel)
+    verbose = normalize_verbosity(verbose)
 
+    if verbosity_enabled(verbose, logging.INFO):
+        logger.info(
+            "Resolving include '%s' relative to '%s'",
+            include_path,
+            filepath,
+        )
+    
     base_dir = os.path.dirname(filepath)
 
     include_filepath = os.path.normpath(
@@ -166,15 +174,20 @@ def resolve_include(include_path: str, filepath: str, verbose: Union[bool, int, 
     )
 
     if not os.path.isfile(include_filepath):
-        verbose_print("include", f"Failed to resolve include: file '{include_filepath}' not found", VerbosityLevel.DEBUG, vlevel)
+        if verbosity_enabled(verbose, logging.DEBUG):
+            logger.debug(
+                "Failed to resolve include: File '%s' not found",
+                include_filepath,
+            )
+
         raise UnresolvableIncludeError(
             f"Could not resolve include '{include_path}' from '{filepath}'"
         )
 
     with open(include_filepath, "rb") as f:
         bom = f.read(2)
-        is_unicode = (bom == codecs.BOM_UTF16_LE)
-        encoding = "utf-16-le" if is_unicode else "ascii"
+        has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
+        encoding = "utf-16-le" if has_utf16le_bom else "ascii"
 
         data = f.read()
         buffer = bom + data
@@ -186,11 +199,16 @@ def resolve_include(include_path: str, filepath: str, verbose: Union[bool, int, 
                 f"Could not decode include '{include_filepath}'"
             ) from e
 
-    verbose_print("include", f"Successfully loaded include '{include_filepath}'", VerbosityLevel.NORMAL, vlevel)
+    if verbosity_enabled(verbose, logging.INFO):
+        logger.info(
+            "Successfully loaded include '%s'",
+            include_filepath,
+        )
+    
     return resolve_includes(include_text, include_filepath, verbose=verbose)
 
 
-def resolve_includes(text: str, filepath: str, verbose: Union[bool, int, VerbosityLevel, None] = None) -> str:
+def resolve_includes(text: str, filepath: str, verbose: Verbose = None) -> str:
     """
     Resolves all include statements recursively and returns the fully
     expanded text.
@@ -201,7 +219,7 @@ def resolve_includes(text: str, filepath: str, verbose: Union[bool, int, Verbosi
     Args:
         text: Source text to resolve includes in.
         filepath: Path of the source file the text originated from.
-        verbose: Optional verbosity level.
+        verbose (Verbose, optional): Optional verbosity level.
 
     Returns:
         The full text with all includes resolved.
@@ -220,7 +238,8 @@ def resolve_includes(text: str, filepath: str, verbose: Union[bool, int, Verbosi
             f"Parameter 'filepath' must be str, but got {type(filepath).__name__}"
         )
 
-    vlevel = normalize_verbosity(verbose)
+    verbose = normalize_verbosity(verbose)
+
     include_re = re.compile(
         r'include\s*\(\s*([\'"])(.*?)\1\s*\)',
         re.IGNORECASE
@@ -235,14 +254,25 @@ def resolve_includes(text: str, filepath: str, verbose: Union[bool, int, Verbosi
             break
 
         include_path = include_match.group(2)
-        verbose_print("include", f"Found include statement: '{include_path}' in '{filepath}'", VerbosityLevel.NORMAL, vlevel)
 
+        if verbosity_enabled(verbose, logging.INFO):
+            logger.info(
+                "Found include statement: '%s' in '%s'",
+                include_path,
+                filepath,
+            )
+        
         include_filepath = os.path.normpath(
             os.path.join(base_dir, include_path)
         )
 
         if not os.path.isfile(include_filepath):
-            verbose_print("include", f"Failed to resolve include: file '{include_filepath}' not found", VerbosityLevel.DEBUG, vlevel)
+            if verbosity_enabled(verbose, logging.DEBUG):
+                logger.debug(
+                    "Failed to resolve include: File '{include_filepath}' not found",
+                    include_filepath,
+                )
+            
             raise UnresolvableIncludeError(
                 f"Could not resolve include '{include_path}' "
                 f"from '{filepath}'"
@@ -250,8 +280,8 @@ def resolve_includes(text: str, filepath: str, verbose: Union[bool, int, Verbosi
 
         with open(include_filepath, "rb") as f:
             bom = f.read(2)
-            is_unicode = (bom == codecs.BOM_UTF16_LE)
-            encoding = "utf-16-le" if is_unicode else "ascii"
+            has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
+            encoding = "utf-16-le" if has_utf16le_bom else "ascii"
 
             data = f.read()
 
@@ -264,7 +294,12 @@ def resolve_includes(text: str, filepath: str, verbose: Union[bool, int, Verbosi
                     f"Could not decode include '{include_filepath}'"
                 ) from e
 
-        verbose_print("include", f"Loaded include '{include_filepath}', expanding recursively", VerbosityLevel.NORMAL, vlevel)
+        if verbosity_enabled(verbose, logging.INFO):
+            logger.info(
+                "Loaded include '{include_filepath}', expanding recursively...",
+                include_filepath,
+            )
+        
         include_text = resolve_includes(
             include_text,
             include_filepath,
