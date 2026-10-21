@@ -14,7 +14,7 @@ else:
 
 setup(
     name=package_name,
-    version="0.1.0b0",
+    version="0.1.0b2",
     packages=find_packages(),
     install_requires=install_requires,
     author="Peter Grønbæk Andersen",

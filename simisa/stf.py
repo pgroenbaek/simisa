@@ -28,7 +28,7 @@ from typing import Optional, Union
 
 from .include import resolve_include
 from .units import Units
-from .verbose import VerbosityLevel, normalize_verbosity, verbose_print
+from .verbosity import Verbose, normalize_verbosity, verbosity_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +80,9 @@ class StfLexer:
         "_info", "_INFO", "_Info", "_iNfO", "_inFo", "_infO", "_INfO", "_InFo",
     })
     
-    def __init__(self, stream, verbose: Union[bool, int, VerbosityLevel, None] = None):
+    def __init__(self, stream, verbose: Verbose = None):
         self.stream = stream
-        self.verbosity = normalize_verbosity(verbose)
+        self.verbose = normalize_verbosity(verbose)
         self._buffer = self.stream.read(8192)
         self._position = 0
 
@@ -109,7 +109,9 @@ class StfLexer:
             token = self._read_word()
 
             if token.value in self._COMMENT_KEYWORDS:
-                verbose_print("stf", f"Skipping comment block keyword '{token.value}'", VerbosityLevel.DEBUG, self.verbosity)
+                if verbosity_enabled(self.verbose, logging.DEBUG):
+                    logger.debug("Skipping comment block '%s'", token.value)
+                
                 self._consume_comment()
                 continue
 
@@ -296,16 +298,16 @@ class StfTokenStream:
 class StfReader:
 
     @classmethod
-    def from_stream(cls, stream, filepath: str = "", verbose: Union[bool, int, VerbosityLevel, None] = None):
+    def from_stream(cls, stream, filepath: str = "", verbose: Verbose = None):
         lexer = StfLexer(stream, verbose=verbose)
         token_stream = StfTokenStream(lexer)
 
         return cls(token_stream, filepath, verbose=verbose)
     
-    def __init__(self, stream: StfTokenStream, filepath: str = "", verbose: Union[bool, int, VerbosityLevel, None] = None):
+    def __init__(self, stream: StfTokenStream, filepath: str = "", verbose: Verbose = None):
         self.stream = stream
         self.filepath = filepath
-        self.verbosity = normalize_verbosity(verbose)
+        self.verbose = normalize_verbosity(verbose)
         self.injected: Optional["StfReader"] = None
         self.id = None
         self.label = None
@@ -359,9 +361,15 @@ class StfReader:
 
         self._expect(")")
 
-        verbose_print("stf", f"STF include detected: '{include_path_token.value}' in '{self.filepath}'", VerbosityLevel.NORMAL, self.verbosity)
-        include_text = resolve_include(include_path_token.value, self.filepath, verbose=self.verbosity)
-        sub_reader = StfReader.from_stream(io.StringIO(include_text), self.filepath, verbose=self.verbosity)
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info(
+                "STF include detected: '%s' in '%s'",
+                include_path_token.value,
+                self.filepath,
+            )
+
+        include_text = resolve_include(include_path_token.value, self.filepath, verbose=self.verbose)
+        sub_reader = StfReader.from_stream(io.StringIO(include_text), self.filepath, verbose=self.verbose)
 
         self.inject(sub_reader)
 
@@ -378,15 +386,22 @@ class StfReader:
 
         if token.is_block_start:
             self.depth += 1
-            verbose_print("stf", f"Entered block '(' (depth={self.depth})", VerbosityLevel.DEBUG, self.verbosity)
+
+            if verbosity_enabled(self.verbose, logging.DEBUG):
+                logger.debug("Entered block '(' (depth=%d)", self.depth)
 
         elif token.is_block_end:
             self.depth -= 1
-            verbose_print("stf", f"Exited block ')' (depth={self.depth})", VerbosityLevel.DEBUG, self.verbosity)
+            
+            if verbosity_enabled(self.verbose, logging.DEBUG):
+                logger.debug("Exited block ')' (depth=%d)", self.depth)
+
             if self.depth < 0:
                 raise StfReaderError("Unbalanced ')' detected")
 
-        verbose_print("stf", f"Read item: '{token.value}'", VerbosityLevel.DEBUG, self.verbosity)
+        if verbosity_enabled(self.verbose, logging.DEBUG):
+            logger.debug("Read item: %r", token.value)
+
         return token.value
 
     def read_hex(self, default=None):
