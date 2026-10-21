@@ -36,7 +36,7 @@ class SimisaSubheaderError(Exception):
     pass
 
 
-def is_unicode(filepath: str, verbose: Verbose = None) -> Optional[bool]:
+def is_utf16le(filepath: str, verbose: Verbose = None) -> Optional[bool]:
     """
     Checks whether a file is encoded in UTF-16 LE based on its BOM.
 

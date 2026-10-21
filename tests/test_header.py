@@ -71,24 +71,24 @@ def test_is_compressed_garbagefile(global_storage):
     assert is_compressed is None
 
 
-def test_is_unicode_uncompressed_shape(global_storage):
-    is_unicode = simisa.is_unicode(global_storage["shapefile_path"])
-    assert is_unicode
+def test_is_utf16le_uncompressed_shape(global_storage):
+    is_utf16le = simisa.is_utf16le(global_storage["shapefile_path"])
+    assert is_utf16le
 
 
-def test_is_unicode_compressed_worldfile(global_storage):
-    is_unicode = simisa.is_unicode(global_storage["worldfile_compressed_path"])
-    assert not is_unicode
+def test_is_utf16le_compressed_worldfile(global_storage):
+    is_utf16le = simisa.is_utf16le(global_storage["worldfile_compressed_path"])
+    assert not is_utf16le
 
 
-def test_is_unicode_emptyfile(global_storage):
-    is_unicode = simisa.is_unicode(global_storage["emptyfile_path"])
-    assert not is_unicode
+def test_is_utf16le_emptyfile(global_storage):
+    is_utf16le = simisa.is_utf16le(global_storage["emptyfile_path"])
+    assert not is_utf16le
 
 
-def test_is_unicode_garbagefile(global_storage):
-    is_unicode = simisa.is_unicode(global_storage["garbagefile_path"])
-    assert not is_unicode
+def test_is_utf16le_garbagefile(global_storage):
+    is_utf16le = simisa.is_utf16le(global_storage["garbagefile_path"])
+    assert not is_utf16le
 
 
 def test_peek_subheader_uncompressed_shape(global_storage):
