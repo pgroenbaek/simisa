@@ -21,7 +21,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 __version__ = '0.1.0b2'
 __all__ = [
-    'is_unicode', 'peek_header', 'peek_subheader',
+    'is_utf16le', 'peek_header', 'peek_subheader',
     'is_compressed', 'is_binary', 'is_text',
     'read_filetype', 'read_fileversion',
     'SimisaHeaderError', 'SimisaSubheaderError',
@@ -41,7 +41,7 @@ __all__ = [
 
 __author__ = 'Peter Grønbæk Andersen <peter@grnbk.io>'
 
-from .header import is_unicode, peek_header, peek_subheader
+from .header import is_utf16le, peek_header, peek_subheader
 from .header import is_compressed, is_binary, is_text
 from .header import read_filetype, read_fileversion
 from .header import SimisaHeaderError, SimisaSubheaderError
