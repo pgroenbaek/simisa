@@ -241,6 +241,8 @@ class BlockReader(ABC):
                 
                 raise SimisaHeaderError(f"Unrecognized header in {filepath}")
 
+            # Fallback path, try to resolve all includes to make sure the header can be found if inside an include.
+            # Then use 'from_string' to re-do all checks and return the configured reader if a valid header was found.
             if verbosity_enabled(verbose, logging.INFO):
                 logger.info(
                     "Found an include at the start of file '%s', proceeding to resolve the include tree and check for a header again.",
@@ -248,8 +250,6 @@ class BlockReader(ABC):
                     compressed
                 )
 
-            # Fallback path, resolve all includes to make sure the header can be found if inside an include.
-            # Then use 'from_string' to re-do all checks and return the configured reader if a valid header was then found.
             with open(filepath, "rb") as f:
                 bom = f.read(2)
                 has_utf16le_bom = (bom == codecs.BOM_UTF16_LE)
@@ -708,7 +708,7 @@ class TextBlockReader(BlockReader):
         if verbosity_enabled(self.verbose, logging.INFO):
             logger.info(
                 "Verified end of text block '%s'",
-                {self.id.name if self.id else '<root>'},
+                self.id.name if self.id else '<root>',
             )
 
     def read_flags(self) -> int:
@@ -806,7 +806,7 @@ class TextFileReader(TextBlockReader):
         if verbosity_enabled(self.verbose, logging.INFO):
             logger.info(
                 "Verified end of text block '%s'",
-                {self.id.name if self.id else '<root>'},
+                self.id.name if self.id else '<root>',
             )
 
     def end_of_block(self) -> bool:
@@ -998,7 +998,7 @@ class BinaryBlockReader(BlockReader):
         if verbosity_enabled(self.verbose, logging.INFO):
             logger.info(
                 "Verified end of binary block '%s'",
-                {self.id.name if self.id else '<root>'},
+                self.id.name if self.id else '<root>',
             )
 
     def close(self):
@@ -1057,7 +1057,7 @@ class BinaryFileReader(BinaryBlockReader):
         if verbosity_enabled(self.verbose, logging.INFO):
             logger.info(
                 "Verified end of binary block '%s'",
-                {self.id.name if self.id else '<root>'},
+                self.id.name if self.id else '<root>',
             )
 
     def close(self):

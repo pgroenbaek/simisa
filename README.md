@@ -71,7 +71,7 @@ tdb_obj = tdb.load("path/to/trackdatabasefile.tdb")
 tsection_obj = tsection.load("path/to/tsection.dat")
 ```
 
-To read a text string, the `.loads()` function can be used instead. This function takes an in-memory string as input and returns the corresponding object.
+To read an in-memory text string, the `.loads()` function can be used instead. This function takes a string as input and returns the corresponding object.
 
 Compressed or binary data is not supported using the `.loads()` function.
 
@@ -202,7 +202,7 @@ edited_shape_str = shape.dumps(shape_obj)
 
 ### Checking header data
 
-This Python module also contains helper functions for probing the SIMISA header. Useful if you want to know the compression state, the file type or the version of a SIMISA file before actually reading it.
+This Python module also contains helper functions for probing the SIMISA header. Useful if you want to know the compression state, the file type, or the file version before actually reading it.
 
 #### Compression
 
@@ -247,7 +247,7 @@ simisa.is_binary("path/to/shapefile.s")
 
 To enable verbose logging use the `logging` module. You can use either `logging.INFO` or `logging.DEBUG` depending on how much detail is needed. The latter provides everything, including all STF tokens, blocks, and values read.
 
-Here's an example:
+Here's an example of enabling the `logging.DEBUG` log level:
 
 ```python
 import logging

@@ -27,11 +27,11 @@ __all__ = [
     'SimisaHeaderError', 'SimisaSubheaderError',
     'has_includes', 'peek_first_include',
     'resolve_include', 'resolve_includes',
-    'UnresolvableIncludeError',
+    'UnresolvableIncludeError', 'StfReaderError',
     'TokenID', 'Units', 'StfReader',
     'BlockReader', 'BlockWriter', 'BlockFormat',
     'BlockReaderError', 'BlockWriterError',
-    'StfReaderError', 'Verbose',
+    'ProgressCallback', 'Verbose',
     'roaddatabase', 'rdb',
     'shape', 's', 'terrain', 't',
     'tracksections', 'tsection',
@@ -54,6 +54,7 @@ from .stf import StfReader, StfReaderError
 from .reader import BlockReader, BlockReaderError
 from .writer import BlockWriter, BlockWriterError
 from .format import BlockFormat
+from .progress import ProgressCallback
 from .verbosity import Verbose
 
 from . import roaddatabase
