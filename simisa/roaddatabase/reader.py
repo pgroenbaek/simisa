@@ -22,13 +22,18 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..progress import ProgressCallback
 from ..verbosity import Verbose
 from ..trackdatabase.reader import read_track_nodes, read_tr_item_table
 from .models import RoadDB
 
 
 
-def load(filepath: str, verbose: Verbose = None) -> RoadDB:
+def load(
+    filepath: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> RoadDB:
     """
     Load and parse a road database file from disk.
 
@@ -43,7 +48,7 @@ def load(filepath: str, verbose: Verbose = None) -> RoadDB:
         RoadDB: The parsed road database object.
 
     Raises:
-        TypeError: If `filepath` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -54,7 +59,7 @@ def load(filepath: str, verbose: Verbose = None) -> RoadDB:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath, verbose=verbose) as reader:
+    with BlockReader.open(filepath, progress=progress, verbose=verbose) as reader:
 
         if not reader.filetype == 'T':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a road database?")
@@ -62,7 +67,11 @@ def load(filepath: str, verbose: Verbose = None) -> RoadDB:
         return read_roaddb(reader)
 
 
-def loads(rdb_text: str, verbose: Verbose = None) -> RoadDB:
+def loads(
+    rdb_text: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> RoadDB:
     """
     Parse a road database from a string containing rdb data.
 
@@ -78,7 +87,7 @@ def loads(rdb_text: str, verbose: Verbose = None) -> RoadDB:
         RoadDB: The parsed road database object.
 
     Raises:
-        TypeError: If `rdb_text` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -88,7 +97,7 @@ def loads(rdb_text: str, verbose: Verbose = None) -> RoadDB:
     if not isinstance(rdb_text, str):
         raise TypeError(f"Parameter 'rdb_text' must be str, but got {type(rdb_text).__name__}")
 
-    reader = BlockReader.from_string(rdb_text, verbose=verbose)
+    reader = BlockReader.from_string(rdb_text, progress=progress, verbose=verbose)
 
     if not reader.filetype == 'T':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a road database?")

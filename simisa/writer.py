@@ -29,6 +29,7 @@ from typing import Optional, BinaryIO, TextIO, Callable, Any, Union
 
 from .format import BlockFormat
 from .token_id import TokenID
+from .progress import ProgressReporter, ProgressCallback
 from .verbosity import Verbose, normalize_verbosity, verbosity_enabled
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ class BlockWriter(ABC):
         is_binary: bool = False,
         is_utf16le: bool = True,
         is_compressed: bool = False,
+        progress: ProgressCallback = None,
         verbose: Verbose = None
     ) -> "BlockWriter":
         """
@@ -138,6 +140,7 @@ class BlockWriter(ABC):
             is_binary (bool, optional): Whether to write binary data. Defaults to False.
             is_utf16le (bool, optional): Whether to use UTF-16 LE encoding. Defaults to True.
             is_compressed (bool, optional): Whether to compress the output. Defaults to False.
+            progress (ProgressCallback, optional): Callback for receiving progress updates.
             verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:
@@ -238,6 +241,7 @@ class BlockWriter(ABC):
         *,
         filetype: str,
         fileversion: int,
+        progress: ProgressCallback = None,
         verbose: Verbose = None
     ) -> str:
         """
@@ -251,6 +255,7 @@ class BlockWriter(ABC):
                 the desired content.
             filetype (str): SIMISA file type identifier.
             fileversion (int): SIMISA file version.
+            progress (ProgressCallback, optional): Callback for receiving progress updates.
             verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:

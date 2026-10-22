@@ -23,6 +23,7 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..progress import ProgressCallback
 from ..verbosity import Verbose
 from .models import *
 
@@ -30,7 +31,11 @@ logger = logging.getLogger(__name__)
 
 
 
-def load(filepath: str, verbose: Verbose = None) -> Terrain:
+def load(
+    filepath: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> Terrain:
     """
     Load and parse a terrain file from disk.
 
@@ -40,13 +45,14 @@ def load(filepath: str, verbose: Verbose = None) -> Terrain:
 
     Args:
         filepath (str): Path to the terrain file.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         Terrain: The parsed terrain object.
 
     Raises:
-        TypeError: If `filepath` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -57,7 +63,7 @@ def load(filepath: str, verbose: Verbose = None) -> Terrain:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath, verbose=verbose) as reader:
+    with BlockReader.open(filepath, progress=progress, verbose=verbose) as reader:
 
         if not reader.filetype == 't':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a terrain file?")
@@ -65,7 +71,11 @@ def load(filepath: str, verbose: Verbose = None) -> Terrain:
         return read_terrain(reader)
 
 
-def loads(terrain_text: str, verbose: Verbose = None) -> Terrain:
+def loads(
+    terrain_text: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> Terrain:
     """
     Parse terrain from a string containing terrain data.
 
@@ -75,13 +85,14 @@ def loads(terrain_text: str, verbose: Verbose = None) -> Terrain:
 
     Args:
         terrain_text (str): String containing terrain file data.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         Terrain: The parsed terrain object.
 
     Raises:
-        TypeError: If `terrain_text` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -91,7 +102,7 @@ def loads(terrain_text: str, verbose: Verbose = None) -> Terrain:
     if not isinstance(terrain_text, str):
         raise TypeError(f"Parameter 'terrain_text' must be str, but got {type(terrain_text).__name__}")
 
-    reader = BlockReader.from_string(terrain_text, verbose=verbose)
+    reader = BlockReader.from_string(terrain_text, progress=progress, verbose=verbose)
 
     if not reader.filetype == 't':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a terrain file?")

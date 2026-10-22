@@ -36,6 +36,7 @@ from .include import has_includes, peek_first_include
 from .include import resolve_includes, UnresolvableIncludeError
 from .token_id import TokenID
 from .stf import StfReader
+from .progress import ProgressReporter, ProgressCallback
 from .verbosity import Verbose, normalize_verbosity, verbosity_enabled
 
 logger = logging.getLogger(__name__)
@@ -187,7 +188,7 @@ class BlockReader(ABC):
     """
 
     @staticmethod
-    def open(filepath: str, verbose: Verbose = None) -> "BlockReader":
+    def open(filepath: str, progress: ProgressCallback = None, verbose: Verbose = None) -> "BlockReader":
         """
         Open a SIMISA file and construct an appropriate BlockReader.
 
@@ -202,6 +203,7 @@ class BlockReader(ABC):
 
         Args:
             filepath (str): Path to a SIMISA file on disk.
+            progress (ProgressCallback, optional): Callback for receiving progress updates.
             verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:
@@ -345,7 +347,7 @@ class BlockReader(ABC):
             raise
 
     @staticmethod
-    def from_string(data: str, verbose: Verbose = None) -> "BlockReader":
+    def from_string(data: str, progress: ProgressCallback = None, verbose: Verbose = None) -> "BlockReader":
         """
         Construct a BlockReader from in-memory SIMISA text data.
 
@@ -354,6 +356,7 @@ class BlockReader(ABC):
 
         Args:
             data (str): Raw SIMISA text payload.
+            progress (ProgressCallback, optional): Callback for receiving progress updates.
             verbose (Verbose, optional): Verbosity level for logging.
 
         Returns:

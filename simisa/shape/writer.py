@@ -22,6 +22,7 @@ from typing import List
 from .. import TokenID
 from ..format import BlockFormat
 from ..writer import BlockWriter
+from ..progress import ProgressCallback
 from ..verbosity import Verbose
 from .models import *
 
@@ -32,6 +33,7 @@ def dump(
     binary: bool = False,
     ascii: bool = False,
     compressed: bool = False,
+    progress: ProgressCallback = None,
     verbose: Verbose = None
 ) -> None:
     """
@@ -46,10 +48,11 @@ def dump(
         binary (bool): Whether to write binary data. Defaults to False.
         ascii (bool): Whether to write ASCII data. Defaults to False. Always True when binary or compressed.
         compressed (bool): Whether to write compressed data. Defaults to False.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Raises:
-        TypeError: If any parameter has an unexpected type.
+        TypeError: If a parameter is not of the expected type.
         OSError: If the file cannot be written.
     """
     check_params = (
@@ -76,12 +79,17 @@ def dump(
         is_binary=binary,
         is_utf16le=not ascii and not binary and not compressed,
         is_compressed=compressed,
+        progress=progress,
         verbose=verbose
     ) as writer:
         write_shape(writer, shape)
 
 
-def dumps(shape: Shape, verbose: Verbose = None) -> str:
+def dumps(
+    shape: Shape,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> str:
     """
     Write a shape object to a string.
 
@@ -90,13 +98,14 @@ def dumps(shape: Shape, verbose: Verbose = None) -> str:
 
     Args:
         shape (Shape): The shape object to write.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         str: The string containing the shape data.
 
     Raises:
-        TypeError: If `shape` is not a Shape object.
+        TypeError: If a parameter is not of the expected type.
     """
     if not isinstance(shape, Shape):
         raise TypeError(f"Parameter 'shape' must be Shape, but got {type(shape).__name__}")
@@ -105,6 +114,7 @@ def dumps(shape: Shape, verbose: Verbose = None) -> str:
         lambda writer: write_shape(writer, shape),
         filetype="s",
         fileversion=1,
+        progress=progress,
         verbose=verbose
     )
 
