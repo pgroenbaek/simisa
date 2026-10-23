@@ -150,6 +150,8 @@ def read_world_objects(reader: BlockReader) -> List[WorldObj]:
     Returns:
         List[WorldObj]: The parsed world objects.
     """
+    reader.report_progress("Reading world objects...")
+    
     reader.verify_id(TokenID.Tr_Worldfile)
 
     objects: List[WorldObj] = []

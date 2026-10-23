@@ -364,7 +364,7 @@ class BlockReader(ABC):
             raise
 
     @staticmethod
-    def from_string(data: str, progress: ProgressCallback = None, verbose: Verbose = None) -> "BlockReader":
+    def from_string(text_data: str, progress: ProgressCallback = None, verbose: Verbose = None) -> "BlockReader":
         """
         Construct a BlockReader from in-memory SIMISA text data.
 
@@ -372,7 +372,7 @@ class BlockReader(ABC):
         Any includes must be resolved before calling this method.
 
         Args:
-            data (str): Raw SIMISA text payload.
+            text_data (str): Raw SIMISA text payload.
             progress (ProgressCallback, optional): Callback for receiving progress updates.
             verbose (Verbose, optional): Verbosity level for logging.
 
@@ -383,23 +383,23 @@ class BlockReader(ABC):
             TypeError: If a parameter is not of the expected type.
             SimisaHeaderError: If the string does not start with a recognized header.
             SimisaSubheaderError: If the subheader is missing, too short, or binary.
-            UnresolvableIncludeError: If `data` contains unresolved includes.
+            UnresolvableIncludeError: If `text_data` contains unresolved includes.
         """
-        if not isinstance(data, str):
-            raise TypeError(f"Parameter 'data' must be str, but got {type(data).__name__}")
+        if not isinstance(text_data, str):
+            raise TypeError(f"Parameter 'text_data' must be str, but got {type(text_data).__name__}")
 
         progress = ProgressReporter(progress)
         verbose = normalize_verbosity(verbose)
 
-        data = data.lstrip("\ufeff\r\n\t ")
+        text_data = text_data.lstrip("\ufeff\r\n\t ")
 
-        if has_includes(data):
+        if has_includes(text_data):
             raise UnresolvableIncludeError(
                 "Includes are not supported with 'from_string', "
                 "use the 'resolve_includes' function beforehand."
             )
 
-        stream = io.StringIO(data)
+        stream = io.StringIO(text_data)
 
         header = stream.read(16).lstrip("\r\n")
 
@@ -616,14 +616,22 @@ class TextBlockReader(BlockReader):
         for name, token in TokenID.__members__.items()
     }
 
-    def __init__(self, verbose: Verbose = None):
-        self.stf_reader: Optional[StfReader] = None
-        self.id: Optional[TokenID] = None
-        self.label: Optional[str] = None
+    def __init__(
+        self,
+        stf_reader: StfReader,
+        parent: Optional["TextBlockReader"] = None,
+        id: Optional[TokenID] = None,
+        label: Optional[str] = None,
+        verbose: Verbose = None
+    ):
+        self.stf_reader = stf_reader
+        self.parent = parent
+        self.id = id
+        self.label = label
+        self.verbose: Optional[int] = normalize_verbosity(verbose)
         self.start_depth: int = 0
         self.at_end_of_block: bool = False
         self.is_closed: bool = False
-        self.verbose: Optional[int] = normalize_verbosity(verbose)
 
     def _get_token_id(self, token: str) -> TokenID:
         t = token.lower()
@@ -638,8 +646,11 @@ class TextBlockReader(BlockReader):
         return TokenID.comment
 
     def read_sub_block(self) -> Optional[BlockReader]:
-        sub_block = TextBlockReader(verbose=self.verbose)
-        sub_block.stf_reader = self.stf_reader
+        sub_block = TextBlockReader(
+            self.stf_reader,
+            parent=self,
+            verbose=self.verbose
+        )
 
         token = self.stf_reader.read_item()
 
@@ -809,7 +820,10 @@ class TextFileReader(TextBlockReader):
         progress: ProgressReporter,
         verbose: Verbose = None
     ):
-        super().__init__(verbose=verbose)
+        super().__init__(
+            StfReader.from_stream(stream, filepath, verbose=verbose),
+            verbose=verbose
+        )
         self.stream = stream
         self.filepath = filepath
         self.filetype = filetype
@@ -818,7 +832,6 @@ class TextFileReader(TextBlockReader):
         self.progress = progress
         self.is_closed = False
         self.at_end_of_block = False
-        self.stf_reader = StfReader.from_stream(stream, filepath, verbose=self.verbose)
 
     def skip(self) -> None:
         if self.is_closed:
@@ -880,16 +893,25 @@ class BinaryBlockReader(BlockReader):
     _FLOAT32 = struct.Struct("<f")
     _BLOCK_HEADER = struct.Struct("<HHI")
 
-    def __init__(self, verbose: Verbose = None):
-        self.filepath: str = ""
-        self.stream: Optional[BinaryIO] = None
-        self.token_offset: int = 0
-        self.remaining_bytes: int = 0
-        self.id: Optional[TokenID] = None
-        self.flags: int = 0
-        self.label: Optional[str] = None
-        self._buffer: Optional[bytes] = None
+    def __init__(
+        self,
+        stream: BinaryIO,
+        parent: Optional["BinaryBlockReader"] = None,
+        id: Optional[TokenID] = None,
+        label: Optional[str] = None,
+        flags: int = 0,
+        token_offset: int = 0,
+        verbose: Verbose = None
+    ):
+        self.stream = stream
+        self.parent = parent
+        self.id = id
+        self.label = label
+        self.flags = flags
+        self.token_offset = token_offset
         self.verbose: Optional[int] = normalize_verbosity(verbose)
+        self.remaining_bytes: int = 0
+        self._buffer: Optional[bytes] = None
 
     def _read(self, num_bytes: int) -> bytes:
         if self.stream is None:
@@ -922,12 +944,12 @@ class BinaryBlockReader(BlockReader):
 
         raw_id, raw_flags, size = self._BLOCK_HEADER.unpack(self._read(8))
 
-        sub_block = BinaryBlockReader(verbose=self.verbose)
-        sub_block.stream = self.stream
-        sub_block.filepath = self.filepath
-        sub_block.token_offset = self.token_offset
-        sub_block.filetype = self.filetype
-        sub_block.fileversion = self.fileversion
+        sub_block = BinaryBlockReader(
+            self.stream,
+            parent=self,
+            token_offset=self.token_offset,
+            verbose=self.verbose
+        )
 
         sub_block.flags = raw_flags
         sub_block.remaining_bytes = size
@@ -1072,12 +1094,14 @@ class BinaryFileReader(BinaryBlockReader):
         progress: ProgressReporter,
         verbose: Verbose = None
     ):
-        super().__init__(verbose=verbose)
+        super().__init__(
+            stream,
+            token_offset=token_offset,
+            verbose=verbose
+        )
         self.filepath = filepath
-        self.stream = stream
         self.filetype = filetype
         self.fileversion = fileversion
-        self.token_offset = token_offset
         self.progress = progress
         self.remaining_bytes = float("inf")
 

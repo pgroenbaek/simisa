@@ -25,7 +25,7 @@ import logging
 import inspect
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import Optional, BinaryIO, TextIO, Callable, Any, Union
+from typing import Optional, BinaryIO, TextIO, Callable, Any
 
 from .format import BlockFormat
 from .token_id import TokenID
@@ -430,7 +430,7 @@ class TextBlockWriter(BlockWriter):
 
     def __init__(
         self,
-        stream: Optional[Union[io.TextIOBase, io.StringIO]] = None,
+        stream: Optional[TextIO] = None,
         parent: Optional['TextBlockWriter'] = None,
         encoding: str = "utf-8",
         verbose: Verbose = None
@@ -755,11 +755,11 @@ class TextBlockWriter(BlockWriter):
 
     def report_total(self, total: int) -> None:
         if self.parent is not None:
-            self.parent.report_total(message)
+            self.parent.report_total(total)
     
     def report_progress(self, current: int, message: str) -> None:
         if self.parent is not None:
-            self.parent.report_progress(message)
+            self.parent.report_progress(current, message)
     
     def flush(self) -> None:
         if self._closed:
@@ -794,7 +794,7 @@ class TextFileWriter(TextBlockWriter):
 
     def __init__(
         self,
-        stream: Union[io.TextIOBase, io.StringIO],
+        stream: TextIO,
         filepath: str,
         encoding: str,
         is_compressed: bool,
@@ -1036,7 +1036,7 @@ class BinaryBlockWriter(BlockWriter):
     
     def report_progress(self, current: int, message: str) -> None:
         if self.parent is not None:
-            self.parent.report_progress(message)
+            self.parent.report_progress(current, message)
     
     def flush(self) -> None:
         if self.stream:

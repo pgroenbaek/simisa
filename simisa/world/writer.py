@@ -183,6 +183,8 @@ def write_world_objects(writer: BlockWriter, objects: List[WorldObj]) -> None:
         writer (BlockWriter): Writer to write the world objects to.
         objects (List[WorldObj]): List of world object objects to write.
     """
+    writer.report_total(len(objects))
+
     for world_obj in objects:
         if not isinstance(world_obj, WorldObj):
             raise TypeError(f"World property 'objects' must contain WorldObj objects, but got {type(world_obj).__name__}")
@@ -194,7 +196,9 @@ def write_world_objects(writer: BlockWriter, objects: List[WorldObj]) -> None:
 
     current_watermark = 0
 
-    for world_obj in sorted_objects:
+    for idx, world_obj in enumerate(sorted_objects):
+        writer.report_progress(idx, "Writing world objects...")
+
         if current_watermark != world_obj.static_detail_level:
             write_watermark(writer, world_obj.static_detail_level)
             current_watermark = world_obj.static_detail_level
