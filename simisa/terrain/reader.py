@@ -251,6 +251,8 @@ def read_terrain_shaders(reader: BlockReader) -> List[TerrainShader]:
     count = reader.read_int()
     
     for shader_block in reader:
+        reader.report_progress("Reading terrain shaders...")
+
         shader_block.verify_id(TokenID.terrain_shader)
 
         shader_name = shader_block.read_string()
@@ -375,8 +377,6 @@ def read_terrain_patchsets(reader: BlockReader) -> List[TerrainPatchset]:
     Returns:
         List[TerrainPatchset]: The parsed terrain patchsets.
     """
-    reader.report_progress("Reading terrain patches...")
-
     with reader.sub_block(TokenID.terrain_patchsets) as patchsets_block:
         terrain_patchsets: List[TerrainPatchset] = []
         count = patchsets_block.read_int()
@@ -434,6 +434,8 @@ def read_terrain_patchset_patches(reader: BlockReader) -> List[TerrainPatchsetPa
     patchset_patches: List[TerrainPatchsetPatch] = []
     
     for patchset_patch_block in reader:
+        reader.report_progress("Reading terrain patches...")
+
         patchset_patch_block.verify_id(TokenID.terrain_patchset_patch)
 
         flags = patchset_patch_block.read_flags()
