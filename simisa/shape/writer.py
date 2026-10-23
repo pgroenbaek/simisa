@@ -824,7 +824,7 @@ def write_distance_level_header(writer: BlockWriter, header: DistanceLevelHeader
 
     with writer.sub_block(TokenID.distance_level_header, block_format=DLEVEL_HEADER_BLOCK) as dist_level_header_block:
         with dist_level_header_block.sub_block(TokenID.dlevel_selection) as dlevel_selection_block:
-            dlevel_selection_block.write_int(int(header.dlevel_selection))
+            dlevel_selection_block.write_float(header.dlevel_selection)
         
         with dist_level_header_block.sub_block(TokenID.hierarchy) as hierarchy_block:
             hierarchy_block.write_count(len(header.hierarchy))

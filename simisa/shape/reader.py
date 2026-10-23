@@ -956,8 +956,8 @@ def read_distance_level_header(reader: BlockReader) -> DistanceLevelHeader:
         hierarchy: List[int] = []
         
         with dlevel_header_block.sub_block(TokenID.dlevel_selection) as dlevel_selection_block:
-            dlevel_selection = float(dlevel_selection_block.read_uint())
-
+            dlevel_selection = int(dlevel_selection_block.read_float())
+        
         with dlevel_header_block.sub_block(TokenID.hierarchy) as hierarchy_block:
             count = hierarchy_block.read_int()
             
@@ -990,7 +990,7 @@ def read_sub_objects(reader: BlockReader, distance_level_header: DistanceLevelHe
         count = sub_objects_block.read_int()
         
         for idx, sub_object_block in enumerate(sub_objects_block):
-            distance_level = int(distance_level_header.dlevel_selection)
+            distance_level = distance_level_header.dlevel_selection
             reader.report_progress(f"Reading sub object {idx} in LOD level {distance_level}...")
 
             sub_object_block.verify_id(TokenID.sub_object)

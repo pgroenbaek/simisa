@@ -69,6 +69,8 @@ class StfToken:
 
 
 class StfLexer:
+    _CHUNK_SIZE = 8192
+
     _EOF_TOKEN = StfToken("eof", "")
     _LEFT_PARENTHESIS_TOKEN = StfToken("(", "(")
     _RIGHT_PARENTHESIS_TOKEN = StfToken(")", ")")
@@ -83,15 +85,14 @@ class StfLexer:
     def __init__(self, stream: TextIO, verbose: Verbose = None):
         self.stream = stream
         self.verbose = normalize_verbosity(verbose)
-        self._bytes_consumed = 0
-        self._buffer = ""
+        self._chars_consumed = 0
+        self._buffer = self.stream.read(self._CHUNK_SIZE)
+        self._buffer_size = len(self._buffer)
         self._position = 0
-        self._byte_positions = [0]
-        self._set_buffer(self.stream.read(8192))
     
     @property
-    def bytes_read(self) -> int:
-        return self._bytes_consumed + self._byte_positions[self._position]
+    def chars_read(self) -> int:
+        return self._chars_consumed + self._position
 
     def next_token(self):
         while True:
@@ -125,21 +126,10 @@ class StfLexer:
             return token
 
     def _refill(self):
-        self._bytes_consumed += self._byte_positions[-1]
-        self._set_buffer(self.stream.read(8192))
-    
-    def _set_buffer(self, buffer: str) -> None:
-        self._buffer = buffer
+        self._chars_consumed += self._buffer_size - len(self._buffer) + self._position
+        self._buffer = self.stream.read(self._CHUNK_SIZE)
+        self._buffer_size = len(self._buffer)
         self._position = 0
-
-        byte_positions = [0]
-        byte_position = 0
-
-        for c in buffer:
-            byte_position += len(c.encode("utf-8"))
-            byte_positions.append(byte_position)
-
-        self._byte_positions = byte_positions
 
     def _read(self):
         if self._position >= len(self._buffer):
@@ -304,8 +294,8 @@ class StfTokenStream:
         self.current = None
 
     @property
-    def bytes_read(self) -> int:
-        return self.lexer.bytes_read
+    def chars_read(self) -> int:
+        return self.lexer.chars_read
 
     def next(self) -> StfToken:
         self.current = self.buffer
@@ -339,8 +329,8 @@ class StfReader:
         self._ended = False
     
     @property
-    def bytes_read(self) -> int:
-        return self.token_stream.bytes_read
+    def chars_read(self) -> int:
+        return self.token_stream.chars_read
 
     def next(self) -> StfToken:
         while self.injected is not None:

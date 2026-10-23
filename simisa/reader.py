@@ -63,9 +63,16 @@ class CompressedStreamReader(io.RawIOBase):
         self._buffer = bytearray()
         self._buffer_position = 0
         self._eof = False
+        self._position = 0
 
     def readable(self):
         return True
+    
+    def seekable(self):
+        return False
+
+    def tell(self):
+        return self._position
     
     @property
     def closed(self):
@@ -79,9 +86,13 @@ class CompressedStreamReader(io.RawIOBase):
             return b""
 
         if size is None or size < 0:
-            return self._read_all()
+            data = self._read_all()
+        else:
+            data = self._read_exact(size)
 
-        return self._read_exact(size)
+        self._position += len(data)
+        
+        return data
 
     def _read_all(self):
         chunks = []
@@ -877,7 +888,11 @@ class TextFileReader(TextBlockReader):
         return self.stf_reader.eof()
     
     def report_progress(self, message: str) -> None:
-        current = self.stf_reader.bytes_read
+        current = self.stf_reader.chars_read
+        is_utf16le = self.encoding in ("utf-16-le", "UTF-16-LE")
+
+        if is_utf16le:
+            current *= 2
 
         self.progress.update(message, current)
 
