@@ -451,7 +451,7 @@ class BlockReader(ABC):
                 fileversion,
             )
         
-        progress.report_total(len(text_data))
+        progress.total(len(text_data))
 
         return TextFileReader(
             stream,

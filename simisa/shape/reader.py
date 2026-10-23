@@ -214,6 +214,8 @@ def read_volumes(reader: BlockReader) -> List[VolumeSphere]:
         count = volumes_block.read_int()
         
         for vol_sphere_block in volumes_block:
+            reader.report_progress("Reading volumes...")
+
             vol_sphere_block.verify_id(TokenID.vol_sphere)
 
             vector = read_vector(vol_sphere_block)
@@ -319,13 +321,13 @@ def read_points(reader: BlockReader) -> List[Point]:
     Returns:
         List[Point]: The parsed points.
     """
-    reader.report_progress("Reading points...")
-
     with reader.sub_block(TokenID.points) as points_block:
         points: List[Point] = []
         count = points_block.read_int()
         
         for point_block in points_block:
+            reader.report_progress("Reading points...")
+
             point_block.verify_id(TokenID.point)
 
             x = point_block.read_float()
@@ -355,13 +357,13 @@ def read_uv_points(reader: BlockReader) -> List[UVPoint]:
     Returns:
         List[UVPoint]: The parsed UV points.
     """
-    reader.report_progress("Reading UV points...")
-
     with reader.sub_block(TokenID.uv_points) as uv_points_block:
         uv_points: List[UVPoint] = []
         count = uv_points_block.read_int()
         
         for uv_point_block in uv_points_block:
+            reader.report_progress("Reading UV points...")
+
             uv_point_block.verify_id(TokenID.uv_point)
 
             u = uv_point_block.read_float()
@@ -389,13 +391,13 @@ def read_normals(reader: BlockReader) -> List[Vector]:
     Returns:
         List[Vector]: The parsed normals.
     """
-    reader.report_progress("Reading normals...")
-
     with reader.sub_block(TokenID.normals) as normals_block:
         normals: List[Vector] = []
         count = normals_block.read_int()
         
         for vector_block in normals_block:
+            reader.report_progress("Reading normals...")
+
             vector_block.verify_id(TokenID.vector)
 
             x = vector_block.read_float()
@@ -500,6 +502,8 @@ def read_matrices(reader: BlockReader) -> List[Matrix]:
         count = matrices_block.read_int()
         
         for matrix_block in matrices_block:
+            reader.report_progress("Reading matrices...")
+
             matrix_block.verify_id(TokenID.matrix)
 
             name = matrix_block.label
@@ -582,6 +586,8 @@ def read_textures(reader: BlockReader) -> List[Texture]:
         count = textures_block.read_int()
         
         for texture_block in textures_block:
+            reader.report_progress("Reading textures...")
+
             texture_block.verify_id(TokenID.texture)
 
             image_index = texture_block.read_int()
@@ -770,6 +776,8 @@ def read_vtx_states(reader: BlockReader) -> List[VtxState]:
         count = vtx_states_block.read_int()
         
         for vtx_state_block in vtx_states_block:
+            reader.report_progress("Reading vtx states...")
+
             vtx_state_block.verify_id(TokenID.vtx_state)
 
             flags = vtx_state_block.read_flags()
@@ -814,6 +822,8 @@ def read_prim_states(reader: BlockReader) -> List[PrimState]:
         count = prim_states_block.read_int()
         
         for prim_state_block in prim_states_block:
+            reader.report_progress("Reading prim states...")
+
             prim_state_block.verify_id(TokenID.prim_state)
 
             name = prim_state_block.label
@@ -926,7 +936,7 @@ def read_distance_levels(reader: BlockReader) -> List[DistanceLevel]:
             distance_level_block.verify_id(TokenID.distance_level)
 
             distance_level_header = read_distance_level_header(distance_level_block)
-            sub_objects = read_sub_objects(distance_level_block, distance_level_header)
+            sub_objects = read_sub_objects(distance_level_block)
 
             distance_level = DistanceLevel(
                 distance_level_header=distance_level_header,
@@ -972,7 +982,7 @@ def read_distance_level_header(reader: BlockReader) -> DistanceLevelHeader:
         )
 
 
-def read_sub_objects(reader: BlockReader, distance_level_header: DistanceLevelHeader) -> List[SubObject]:
+def read_sub_objects(reader: BlockReader) -> List[SubObject]:
     """
     Read and parse sub-objects from a BlockReader.
 
@@ -980,7 +990,6 @@ def read_sub_objects(reader: BlockReader, distance_level_header: DistanceLevelHe
 
     Args:
         reader (BlockReader): Reader positioned at a sub-objects block.
-        distance_level_header (DistanceLevelHeader): The distance level header.
 
     Returns:
         List[SubObject]: The parsed sub-objects.
@@ -990,9 +999,6 @@ def read_sub_objects(reader: BlockReader, distance_level_header: DistanceLevelHe
         count = sub_objects_block.read_int()
         
         for idx, sub_object_block in enumerate(sub_objects_block):
-            distance_level = distance_level_header.dlevel_selection
-            reader.report_progress(f"Reading sub object {idx} in LOD level {distance_level}...")
-
             sub_object_block.verify_id(TokenID.sub_object)
 
             sub_object_header = read_sub_object_header(sub_object_block)
@@ -1062,6 +1068,8 @@ def read_geometry_info(reader: BlockReader) -> GeometryInfo:
     Returns:
         GeometryInfo: The parsed geometry information.
     """
+    reader.report_progress("Reading geometry info...")
+
     with reader.sub_block(TokenID.geometry_info) as geometry_info_block:
         face_normals = geometry_info_block.read_int()
         tx_light_cmds = geometry_info_block.read_int()
@@ -1247,6 +1255,8 @@ def read_vertices(reader: BlockReader) -> List[Vertex]:
         count = vertices_block.read_int()
         
         for vertex_block in vertices_block:
+            reader.report_progress("Reading vertices...")
+
             vertex_block.verify_id(TokenID.vertex)
 
             flags = vertex_block.read_flags()
@@ -1398,6 +1408,8 @@ def read_vertex_idxs(reader: BlockReader) -> List[VertexIdx]:
         count = vertex_idxs_block.read_int()
         
         for _ in range(count // 3):
+            reader.report_progress("Reading vertex idxs...")
+
             vertex1_index = vertex_idxs_block.read_int()
             vertex2_index = vertex_idxs_block.read_int()
             vertex3_index = vertex_idxs_block.read_int()
@@ -1430,6 +1442,8 @@ def read_normal_idxs(reader: BlockReader) -> List[NormalIdx]:
         count = normal_idxs_block.read_int()
         
         for _ in range(count):
+            reader.report_progress("Reading normal idxs...")
+
             index = normal_idxs_block.read_int()
             unknown2 = normal_idxs_block.read_int()
 
@@ -1460,6 +1474,8 @@ def read_flags(reader: BlockReader) -> List[int]:
         count = flags_block.read_int()
         
         for _ in range(count):
+            reader.report_progress("Reading flags...")
+
             flags.append(flags_block.read_flags())
 
         flags_block.verify_count(count, len(flags))
@@ -1479,8 +1495,6 @@ def read_animations(reader: BlockReader) -> List[Animation]:
     Returns:
         List[Animation]: The parsed animations.
     """
-    reader.report_progress(f"Reading animations...")
-
     with reader.sub_block(TokenID.animations) as animations_block:
         animations: List[Animation] = []
         count = animations_block.read_int()
@@ -1521,6 +1535,8 @@ def read_anim_nodes(reader: BlockReader) -> List[AnimationNode]:
         count = anim_nodes_block.read_int()
         
         for anim_node_block in anim_nodes_block:
+            reader.report_progress("Reading animation nodes...")
+
             anim_node_block.verify_id(TokenID.anim_node)
 
             name = anim_node_block.label
