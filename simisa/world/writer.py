@@ -197,7 +197,7 @@ def write_world_objects(writer: BlockWriter, objects: List[WorldObj]) -> None:
     current_watermark = 0
 
     for idx, world_obj in enumerate(sorted_objects):
-        writer.report_progress(idx, "Writing world objects...")
+        writer.report_progress("Writing world objects...", idx)
 
         if current_watermark != world_obj.static_detail_level:
             write_watermark(writer, world_obj.static_detail_level)

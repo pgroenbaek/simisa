@@ -414,7 +414,7 @@ class BlockWriter(ABC):
         pass
     
     @abstractmethod
-    def report_progress(self, current: int, message: str) -> None:
+    def report_progress(self, message: str, current: int) -> None:
         pass
 
     @abstractmethod
@@ -815,8 +815,8 @@ class TextFileWriter(TextBlockWriter):
     def report_total(self, total: int) -> None:
         self.progress.total(total)
     
-    def report_progress(self, current: int, message: str) -> None:
-        self.progress.update(current, message)
+    def report_progress(self, message: str, current: int) -> None:
+        self.progress.update(message, current)
     
     def flush(self) -> None:
         super().flush()
@@ -1080,8 +1080,8 @@ class BinaryFileWriter(BinaryBlockWriter):
     def report_total(self, total: int) -> None:
         self.progress.total(total)
     
-    def report_progress(self, current: int, message: str) -> None:
-        self.progress.update(current, message)
+    def report_progress(self, message: str, current: int) -> None:
+        self.progress.update(message, current)
 
     def flush(self) -> None:
         if not self.is_closed and self.stream:

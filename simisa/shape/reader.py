@@ -991,7 +991,7 @@ def read_sub_objects(reader: BlockReader, distance_level_header: DistanceLevelHe
         
         for idx, sub_object_block in enumerate(sub_objects_block):
             distance_level = int(distance_level_header.dlevel_selection)
-            reader.report_progress(f"Reading sub object {idx + 1} in LOD level {distance_level}...")
+            reader.report_progress(f"Reading sub object {idx} in LOD level {distance_level}...")
 
             sub_object_block.verify_id(TokenID.sub_object)
 

@@ -240,8 +240,26 @@ simisa.is_binary("path/to/shapefile.s")
 
 ### Using progress callbacks
 
+To track the progress of reading and writing files, you can provide a callback function to the `progress` parameter.
 
+```python
+from simisa import s
 
+def print_progress(message, fraction):
+    print(f"Progress: {fraction * 100:.1f}% - {message}")
+
+shape_obj = s.load("/path/to/shapefile.s", progress=print_progress)
+```
+
+Or as a lambda:
+
+```python
+from simisa import s
+
+print_progress = lambda m, f: print(f"Progress: {f * 100:.1f}% - {m}")
+
+shape_obj = s.load("/path/to/shapefile.s", progress=print_progress)
+```
 
 ### Enabling verbose logging
 

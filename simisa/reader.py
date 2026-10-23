@@ -22,6 +22,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import io
+import os
 import zlib
 import struct
 import codecs
@@ -222,6 +223,7 @@ class BlockReader(ABC):
         progress = ProgressReporter(progress)
         verbose = normalize_verbosity(verbose)
 
+        total_size = os.path.getsize(filepath)
         compressed = is_compressed(filepath, verbose=verbose)
 
         if compressed is None: # Header unknown, it is either missing, invalid or inside an include.
@@ -291,6 +293,11 @@ class BlockReader(ABC):
                 header = header_bytes[:8].decode(encoding, errors="ignore")
             
             if compressed:
+                size_position = 18 if has_utf16le_bom else 8
+                total_size = int.from_bytes(
+                    header_bytes[size_position:size_position + 4],
+                    "little",
+                )
                 stream = CompressedStreamReader(f)
             else:
                 if header.startswith("\r\n"):
@@ -314,6 +321,8 @@ class BlockReader(ABC):
             filetype = subheader[5]
             fileversion = int(subheader[6])
             fileformat = subheader[7]
+
+            progress.total(total_size)
 
             if fileformat == "b":
                 token_offset = 300 if filetype == "w" else 0
@@ -870,7 +879,7 @@ class TextFileReader(TextBlockReader):
     def report_progress(self, message: str) -> None:
         current = self.stf_reader.bytes_read
 
-        self.progress.update(current, message)
+        self.progress.update(message, current)
 
     def close(self) -> None:
         if not self.is_closed:
@@ -1142,7 +1151,7 @@ class BinaryFileReader(BinaryBlockReader):
     def report_progress(self, message: str) -> None:
         current = self.stream.tell()
 
-        self.progress.update(current, message)
+        self.progress.update(message, current)
 
     def close(self) -> None:
         if self.stream:
