@@ -85,6 +85,7 @@ class ProgressReporter:
         self.callback = callback
         self.interval = float(interval)
         self._total = 0
+        self._current = 0
         self._last_progress: Optional[float] = None
         self._last_message: Optional[str] = None
 
@@ -107,7 +108,24 @@ class ProgressReporter:
             )
 
         self._total = total
-    
+
+    def increment(self, message: str) -> None:
+        """
+        Increment the current progress by one and report the update.
+
+        Args:
+            message: Human-readable description of the current operation.
+
+        Raises:
+            TypeError: If a parameter is not of the expected type.
+        """
+        if not isinstance(message, str):
+            raise TypeError(
+                f"Parameter 'message' must be str, but got {type(message).__name__}"
+            )
+        
+        self.update(message, self._current + 1)
+
     def update(self, message: str, current: int) -> None:
         """
         Report the current progress of an operation.
@@ -140,10 +158,12 @@ class ProgressReporter:
                 f"Parameter 'current' must be int, but got {type(current).__name__}"
             )
 
+        self._current = current
+
         if self._total <= 0:
             progress = 0.0
         else:
-            progress = current / self._total
+            progress = self._current / self._total
             progress = max(0.0, min(1.0, progress))
 
         should_report = (

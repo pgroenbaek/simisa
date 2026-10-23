@@ -261,6 +261,52 @@ def write_shape(writer: BlockWriter, shape: Shape) -> None:
         writer (BlockWriter): Writer to write the shape block to.
         shape (Shape): The shape object to write.
     """
+    points_count = len(shape.points)
+    uv_points_count = len(shape.uv_points)
+    normals_count = len(shape.normals)
+
+    vertex_count = sum(
+        len(sub_object.vertices)
+        for lod_control in shape.lod_controls
+        for distance_level in lod_control.distance_levels
+        for sub_object in distance_level.sub_objects
+    )
+
+    vertex_idxs_count = sum(
+        len(primitive.indexed_trilist.vertex_idxs)
+        for lod_control in shape.lod_controls
+        for distance_level in lod_control.distance_levels
+        for sub_object in distance_level.sub_objects
+        for primitive in sub_object.primitives
+    )
+
+    normal_idxs_count = sum(
+        len(primitive.indexed_trilist.normal_idxs)
+        for lod_control in shape.lod_controls
+        for distance_level in lod_control.distance_levels
+        for sub_object in distance_level.sub_objects
+        for primitive in sub_object.primitives
+    )
+
+    flags_count = sum(
+        len(primitive.indexed_trilist.flags)
+        for lod_control in shape.lod_controls
+        for distance_level in lod_control.distance_levels
+        for sub_object in distance_level.sub_objects
+        for primitive in sub_object.primitives
+    )
+
+    writer.report_total(sum([
+        points_count,
+        uv_points_count,
+        normals_count,
+        vertex_count,
+        vertex_idxs_count,
+        normal_idxs_count,
+        flags_count,
+    ]))
+    writer.report_progress("Writing shape data...", 0)
+
     with writer.sub_block(TokenID.shape, block_format=SHAPE_BLOCK) as shape_block:
         write_shape_header(shape_block, shape.shape_header)
         write_volumes(shape_block, shape.volumes)
@@ -408,6 +454,8 @@ def write_points(writer: BlockWriter, points: List[Point]) -> None:
         points_block.write_count(len(points))
 
         for point in points:
+            writer.report_increment("Writing points...")
+
             with points_block.sub_block(TokenID.point) as point_block:
                 point_block.write_float(point.x)
                 point_block.write_float(point.y)
@@ -432,6 +480,8 @@ def write_uv_points(writer: BlockWriter, uv_points: List[UVPoint]) -> None:
         uv_points_block.write_count(len(uv_points))
 
         for uv_point in uv_points:
+            writer.report_increment("Writing UV points...")
+
             with uv_points_block.sub_block(TokenID.uv_point) as uv_point_block:
                 uv_point_block.write_float(uv_point.u)
                 uv_point_block.write_float(uv_point.v)
@@ -455,6 +505,8 @@ def write_normals(writer: BlockWriter, normals: List[Vector]) -> None:
         normals_block.write_count(len(normals))
 
         for normal in normals:
+            writer.report_increment("Writing normals...")
+
             write_vector(normals_block, normal)
 
 
@@ -1038,6 +1090,8 @@ def write_vertices(writer: BlockWriter, vertices: List[Vertex]) -> None:
         vertices_block.write_count(len(vertices))
 
         for vertex in vertices:
+            writer.report_increment("Writing vertices...")
+
             with vertices_block.sub_block(TokenID.vertex, block_format=VERTEX_BLOCK) as vertex_block:
                 vertex_block.write_flags(vertex.flags)
                 vertex_block.write_int(vertex.point_index)
@@ -1151,6 +1205,8 @@ def write_vertex_idxs(writer: BlockWriter, vertex_idxs: List[VertexIdx]) -> None
         vertex_idxs_block.write_count(len(vertex_idxs) * 3)
 
         for vertex_idx in vertex_idxs:
+            writer.report_increment("Writing vertex idxs...")
+
             vertex_idxs_block.write_int(vertex_idx.vertex1_index)
             vertex_idxs_block.write_int(vertex_idx.vertex2_index)
             vertex_idxs_block.write_int(vertex_idx.vertex3_index)
@@ -1174,6 +1230,8 @@ def write_normal_idxs(writer: BlockWriter, normal_idxs: List[NormalIdx]) -> None
         normal_idxs_block.write_count(len(normal_idxs))
 
         for normal_idx in normal_idxs:
+            writer.report_increment("Writing normal idxs...")
+
             normal_idxs_block.write_int(normal_idx.index)
             normal_idxs_block.write_int(normal_idx.unknown2)
 
@@ -1196,6 +1254,8 @@ def write_flags(writer: BlockWriter, flags: List[int]) -> None:
         flags_block.write_count(len(flags))
 
         for flag in flags:
+            writer.report_increment("Writing flags...")
+
             flags_block.write_flags(flag)
 
 

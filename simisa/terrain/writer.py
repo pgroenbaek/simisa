@@ -175,6 +175,9 @@ def write_terrain(writer: BlockWriter, terrain: Terrain) -> None:
         writer (BlockWriter): Writer to write the terrain block to.
         terrain (Terrain): The terrain object to write.
     """
+    writer.report_total(sum([len(p.terrain_patchset_patches) for p in terrain.terrain_patchsets]))
+    writer.report_progress("Writing terrain data...", 0)
+
     with writer.sub_block(TokenID.terrain, block_format=TERRAIN_BLOCK) as terrain_block:
         with terrain_block.sub_block(TokenID.terrain_errthreshold_scale) as errthreshold_scale_block:
             errthreshold_scale_block.write_float(terrain.terrain_errthreshold_scale)
@@ -392,6 +395,8 @@ def write_terrain_patchset_patches(writer: BlockWriter, patches: List[TerrainPat
 
     with writer.sub_block(TokenID.terrain_patchset_patches, block_format=TERRAIN_PATCHSET_PATCHES_BLOCK) as patchset_patches_block:
         for patch in patches:
+            writer.report_increment("Writing terrain patches...")
+
             with patchset_patches_block.sub_block(TokenID.terrain_patchset_patch) as patchset_patch_block:
                 patchset_patch_block.write_flags(patch.flags)
                 patchset_patch_block.write_float(patch.center_x)

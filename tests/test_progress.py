@@ -418,3 +418,83 @@ def test_rejects_keyword_only_callback():
 def test_rejects_non_callable_callback():
     with pytest.raises(TypeError, match="must be callable or None"):
         ProgressReporter("not callable")
+
+
+def test_increment_increases_current_by_one():
+    calls = []
+
+    reporter = ProgressReporter(
+        lambda message, progress: calls.append((message, progress)),
+        interval=0.0,
+    )
+
+    reporter.total(10)
+    reporter.increment("Reading")
+    reporter.increment("Reading")
+    reporter.increment("Reading")
+
+    assert calls == [
+        ("Reading", 0.1),
+        ("Reading", 0.2),
+        ("Reading", 0.3),
+    ]
+
+
+def test_increment_continues_from_update():
+    calls = []
+
+    reporter = ProgressReporter(
+        lambda message, progress: calls.append((message, progress)),
+        interval=0.0,
+    )
+
+    reporter.total(10)
+    reporter.update("Reading", 5)
+    reporter.increment("Reading")
+
+    assert calls == [
+        ("Reading", 0.5),
+        ("Reading", 0.6),
+    ]
+
+
+def test_increment_is_throttled():
+    calls = []
+
+    reporter = ProgressReporter(
+        lambda message, progress: calls.append((message, progress)),
+        interval=0.2,
+    )
+
+    reporter.total(10)
+    reporter.increment("Reading")
+    reporter.increment("Reading")
+
+    assert calls == [
+        ("Reading", 0.1),
+    ]
+
+
+def test_increment_message_change_bypasses_throttling():
+    calls = []
+
+    reporter = ProgressReporter(
+        lambda message, progress: calls.append((message, progress)),
+        interval=0.5,
+    )
+
+    reporter.total(10)
+    reporter.increment("Reading vertices")
+    reporter.increment("Reading normals")
+
+    assert calls == [
+        ("Reading vertices", 0.1),
+        ("Reading normals", 0.2),
+    ]
+
+
+def test_increment_without_callback_does_nothing():
+    reporter = ProgressReporter()
+
+    reporter.total(10)
+    reporter.increment("Reading")

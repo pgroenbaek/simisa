@@ -416,6 +416,10 @@ class BlockWriter(ABC):
     @abstractmethod
     def report_progress(self, message: str, current: int) -> None:
         pass
+    
+    @abstractmethod
+    def report_increment(self, message: str) -> None:
+        pass
 
     @abstractmethod
     def close(self) -> None:
@@ -757,9 +761,13 @@ class TextBlockWriter(BlockWriter):
         if self.parent is not None:
             self.parent.report_total(total)
     
-    def report_progress(self, current: int, message: str) -> None:
+    def report_progress(self, message: str, current: int) -> None:
         if self.parent is not None:
-            self.parent.report_progress(current, message)
+            self.parent.report_progress(message, current)
+
+    def report_increment(self, message: str) -> None:
+        if self.parent is not None:
+            self.parent.report_increment(message)
     
     def flush(self) -> None:
         if self._closed:
@@ -817,6 +825,9 @@ class TextFileWriter(TextBlockWriter):
     
     def report_progress(self, message: str, current: int) -> None:
         self.progress.update(message, current)
+    
+    def report_increment(self, message: str) -> None:
+        self.progress.increment(message)
     
     def flush(self) -> None:
         super().flush()
@@ -1034,9 +1045,13 @@ class BinaryBlockWriter(BlockWriter):
         if self.parent is not None:
             self.parent.report_total(message)
     
-    def report_progress(self, current: int, message: str) -> None:
+    def report_progress(self, message: str, current: int) -> None:
         if self.parent is not None:
-            self.parent.report_progress(current, message)
+            self.parent.report_progress(message, current)
+    
+    def report_increment(self, message: str) -> None:
+        if self.parent is not None:
+            self.parent.report_increment(message)
     
     def flush(self) -> None:
         if self.stream:
@@ -1082,6 +1097,9 @@ class BinaryFileWriter(BinaryBlockWriter):
     
     def report_progress(self, message: str, current: int) -> None:
         self.progress.update(message, current)
+    
+    def report_increment(self, message: str) -> None:
+        self.progress.increment(message)
 
     def flush(self) -> None:
         if not self.is_closed and self.stream:
