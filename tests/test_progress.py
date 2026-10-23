@@ -25,7 +25,8 @@ from simisa.progress import ProgressReporter
 def test_no_callback_does_nothing():
     reporter = ProgressReporter()
 
-    reporter.report("Reading", 50, 100)
+    reporter.total(100)
+    reporter.update("Reading", 50)
     reporter.complete()
 
 
@@ -36,21 +37,23 @@ def test_first_report_triggers_callback():
         lambda message, progress: calls.append((message, progress))
     )
 
-    reporter.report("Reading", 25, 100)
+    reporter.total(100)
+    reporter.update("Reading", 25)
 
     assert calls == [
         ("Reading", 0.25),
     ]
 
 
-def test_progress_is_calculated_from_bytes():
+def test_progress_is_calculated_from_items():
     calls = []
 
     reporter = ProgressReporter(
         lambda message, progress: calls.append((message, progress))
     )
 
-    reporter.report("Reading", 75, 100)
+    reporter.total(100)
+    reporter.update("Reading", 75)
 
     assert calls == [
         ("Reading", 0.75),
@@ -64,7 +67,8 @@ def test_progress_is_clamped_to_zero():
         lambda message, progress: calls.append((message, progress))
     )
 
-    reporter.report("Reading", -10, 100)
+    reporter.total(100)
+    reporter.update("Reading", -10)
 
     assert calls == [
         ("Reading", 0.0),
@@ -78,35 +82,38 @@ def test_progress_is_clamped_to_one():
         lambda message, progress: calls.append((message, progress))
     )
 
-    reporter.report("Reading", 150, 100)
+    reporter.total(100)
+    reporter.update("Reading", 150)
 
     assert calls == [
         ("Reading", 1.0),
     ]
 
 
-def test_zero_total_bytes_reports_zero():
+def test_zero_total_reports_zero():
     calls = []
 
     reporter = ProgressReporter(
         lambda message, progress: calls.append((message, progress))
     )
 
-    reporter.report("Reading", 0, 0)
+    reporter.total(0)
+    reporter.update("Reading", 0)
 
     assert calls == [
         ("Reading", 0.0),
     ]
 
 
-def test_negative_total_bytes_reports_zero():
+def test_negative_total_reports_zero():
     calls = []
 
     reporter = ProgressReporter(
         lambda message, progress: calls.append((message, progress))
     )
 
-    reporter.report("Reading", 10, -1)
+    reporter.total(-1)
+    reporter.update("Reading", 10)
 
     assert calls == [
         ("Reading", 0.0),
@@ -121,9 +128,10 @@ def test_same_message_is_throttled():
         interval=0.1,
     )
 
-    reporter.report("Reading", 10, 100)
-    reporter.report("Reading", 15, 100)
-    reporter.report("Reading", 19, 100)
+    reporter.total(100)
+    reporter.update("Reading", 10)
+    reporter.update("Reading", 15)
+    reporter.update("Reading", 19)
 
     assert calls == [
         ("Reading", 0.1),
@@ -138,9 +146,10 @@ def test_same_message_reports_after_interval():
         interval=0.1,
     )
 
-    reporter.report("Reading", 10, 100)
-    reporter.report("Reading", 15, 100)
-    reporter.report("Reading", 20, 100)
+    reporter.total(100)
+    reporter.update("Reading", 10)
+    reporter.update("Reading", 15)
+    reporter.update("Reading", 20)
 
     assert calls == [
         ("Reading", 0.1),
@@ -156,8 +165,9 @@ def test_message_change_bypasses_throttling():
         interval=0.1,
     )
 
-    reporter.report("Reading vertices", 10, 100)
-    reporter.report("Reading normals", 11, 100)
+    reporter.total(100)
+    reporter.update("Reading vertices", 10)
+    reporter.update("Reading normals", 11)
 
     assert calls == [
         ("Reading vertices", 0.1),
@@ -173,8 +183,9 @@ def test_completion_progress_always_reports():
         interval=0.5,
     )
 
-    reporter.report("Reading", 90, 100)
-    reporter.report("Reading", 100, 100)
+    reporter.total(100)
+    reporter.update("Reading", 90)
+    reporter.update("Reading", 100)
 
     assert calls == [
         ("Reading", 0.9),
@@ -189,7 +200,8 @@ def test_complete_reports_one():
         lambda message, progress: calls.append((message, progress))
     )
 
-    reporter.report("Reading", 50, 100)
+    reporter.total(100)
+    reporter.update("Reading", 50)
     reporter.complete()
 
     assert calls == [
@@ -250,7 +262,8 @@ def test_callback_exception_propagates():
     reporter = ProgressReporter(callback)
 
     with pytest.raises(RuntimeError, match="callback failed"):
-        reporter.report("Reading", 50, 100)
+        reporter.total(100)
+        reporter.update("Reading", 50)
 
 
 @pytest.mark.parametrize(
@@ -322,7 +335,8 @@ def test_report_rejects_non_string_message(message):
     reporter = ProgressReporter(lambda message, progress: None)
 
     with pytest.raises(TypeError):
-        reporter.report(message, 0, 100)
+        reporter.total(100)
+        reporter.update(message, 0)
 
 
 @pytest.mark.parametrize(

@@ -147,7 +147,7 @@ class BlockWriter(ABC):
             BlockWriter: Instance of `BinaryFileWriter` or `TextFileWriter`.
 
         Raises:
-            TypeError: If any parameter has an unexpected type.
+            TypeError: If a parameter is not of the expected type.
             OSError: If the file cannot be opened.
         """
         check_params = (
@@ -168,6 +168,7 @@ class BlockWriter(ABC):
                 f"but got {type(value).__name__}"
             )
         
+        progress = ProgressReporter(progress)
         verbose = normalize_verbosity(verbose)
 
         fileformat = 'b' if is_binary else 't'
@@ -222,7 +223,15 @@ class BlockWriter(ABC):
                     token_offset,
                 )
 
-            return BinaryFileWriter(stream, filepath, token_offset, is_utf16le, is_compressed, verbose=verbose)
+            return BinaryFileWriter(
+                stream,
+                filepath,
+                token_offset,
+                is_utf16le,
+                is_compressed,
+                progress,
+                verbose=verbose
+            )
 
         if verbosity_enabled(verbose, logging.INFO):
             logger.info(
@@ -233,7 +242,14 @@ class BlockWriter(ABC):
                 encoding,
             )
 
-        return TextFileWriter(stream, filepath, encoding, is_compressed, verbose=verbose)
+        return TextFileWriter(
+            stream,
+            filepath,
+            encoding,
+            is_compressed,
+            progress,
+            verbose=verbose
+        )
 
     @staticmethod
     def to_string(
@@ -262,8 +278,7 @@ class BlockWriter(ABC):
             str: The generated SIMISA text data.
 
         Raises:
-            TypeError: If a parameter has an unexpected type or `write_fn`
-                does not accept a positional first parameter.
+            TypeError: If a parameter is not of the expected type.
         """
         check_params = (
             ("filetype", filetype, str),
@@ -289,6 +304,7 @@ class BlockWriter(ABC):
         if not write_fn_params or write_fn_params[0].kind not in positional_params:
             raise TypeError("'write_fn' must accept a BlockWriter as its first parameter")
 
+        progress = ProgressReporter(progress)
         verbose = normalize_verbosity(verbose)
 
         stream = io.StringIO()
@@ -301,7 +317,14 @@ class BlockWriter(ABC):
                 fileversion,
             )
 
-        writer = TextFileWriter(stream, filepath="<string>", encoding="utf-8", is_compressed=False, verbose=verbose)
+        writer = TextFileWriter(
+            stream,
+            "<string>",
+            "utf-8",
+            False,
+            progress,
+            verbose=verbose
+        )
 
         header = "SIMISA@@@@@@@@@@"
         subheader = f"JINX0{filetype}{fileversion}t______\r\n"
@@ -332,7 +355,12 @@ class BlockWriter(ABC):
         self.close()
 
     @contextmanager
-    def sub_block(self, block_id: TokenID, block_label: Optional[str] = None, block_format: Optional[BlockFormat] = None):
+    def sub_block(
+        self,
+        block_id: TokenID,
+        block_label: Optional[str] = None,
+        block_format: Optional[BlockFormat] = None
+    ) -> None:
         sub_block = self.begin_sub_block(block_id, block_label, block_format)
 
         try:
@@ -341,47 +369,60 @@ class BlockWriter(ABC):
             sub_block.end_sub_block()
 
     @abstractmethod
-    def begin_sub_block(self, block_id: TokenID, block_label: Optional[str] = None, block_format: Optional[BlockFormat] = None):
+    def begin_sub_block(
+        self,
+        block_id: TokenID,
+        block_label: Optional[str] = None,
+        block_format: Optional[BlockFormat] = None
+    ) -> None:
         pass
 
     @abstractmethod
-    def end_sub_block(self):
+    def end_sub_block(self) -> None:
         pass
     
     @abstractmethod
-    def write_count(self, value: int):
+    def write_count(self, value: int) -> None:
         pass
 
     @abstractmethod
-    def write_flags(self, value: int):
+    def write_flags(self, value: int) -> None:
         pass
 
     @abstractmethod
-    def write_int(self, value: int):
+    def write_int(self, value: int) -> None:
         pass
 
     @abstractmethod
-    def write_uint(self, value: int):
+    def write_uint(self, value: int) -> None:
         pass
 
     @abstractmethod
-    def write_float(self, value: float):
+    def write_float(self, value: float) -> None:
         pass
 
     @abstractmethod
-    def write_string(self, value: str):
+    def write_string(self, value: str) -> None:
         pass
 
     @abstractmethod
-    def write_comment(self, text: str):
+    def write_comment(self, text: str) -> None:
+        pass
+    
+    @abstractmethod
+    def report_total(self, total: int) -> None:
+        pass
+    
+    @abstractmethod
+    def report_progress(self, current: int, message: str) -> None:
         pass
 
     @abstractmethod
-    def close(self):
+    def close(self) -> None:
         pass
 
     @abstractmethod
-    def flush(self):
+    def flush(self) -> None:
         pass
 
 
@@ -416,7 +457,7 @@ class TextBlockWriter(BlockWriter):
         else:
             self.verbose = None
 
-    def _trim_trailing_whitespace(self, trim_chars=None):
+    def _trim_trailing_whitespace(self, trim_chars=None) -> None:
         if self.block_format.allow_space_at_line_end:
             if trim_chars is not None:
                 trim_chars = trim_chars.replace(" ", "")
@@ -435,14 +476,14 @@ class TextBlockWriter(BlockWriter):
 
             self._buffer.pop()
 
-    def _write_indent(self):
+    def _write_indent(self) -> None:
         if not self.block_format.disable_inner_indent:
             indent = self.indent_char * self.depth
 
             if indent:
                 self._buffer.append(indent)
 
-    def _write_newline(self):
+    def _write_newline(self) -> None:
         if self.parent is not None:
             self.parent._trim_trailing_whitespace(trim_chars=" ")
 
@@ -459,7 +500,7 @@ class TextBlockWriter(BlockWriter):
         self._items_on_line = 0
 
 
-    def _write_value(self, text: str):
+    def _write_value(self, text: str) -> None:
         if not isinstance(text, str):
             raise TypeError(f"Parameter 'text' must be str, but got {type(value).__name__}")
         
@@ -477,7 +518,7 @@ class TextBlockWriter(BlockWriter):
         self._items_on_line += 1
         self._items_total += 1
 
-    def _write_token(self, text: str):
+    def _write_token(self, text: str) -> None:
         if not isinstance(text, str):
             raise TypeError(f"Parameter 'text' must be str, but got {type(text).__name__}")
 
@@ -496,7 +537,7 @@ class TextBlockWriter(BlockWriter):
         block_id: TokenID,
         block_label: Optional[str] = None,
         block_format: Optional[BlockFormat] = None
-    ):
+    ) -> None:
         if self._closed:
             raise ValueError("Cannot begin sub-block on a closed writer")
 
@@ -558,7 +599,7 @@ class TextBlockWriter(BlockWriter):
 
         return sub_block
         
-    def end_sub_block(self):
+    def end_sub_block(self) -> None:
         if not self._writing_block or self._closed:
             return
         
@@ -610,7 +651,7 @@ class TextBlockWriter(BlockWriter):
 
         self._buffer = []
 
-    def write_count(self, value: int):
+    def write_count(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
 
@@ -629,7 +670,7 @@ class TextBlockWriter(BlockWriter):
             if self.block_format.newline_after_count:
                 self._write_newline()
 
-    def write_flags(self, value: int):
+    def write_flags(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
 
@@ -638,7 +679,7 @@ class TextBlockWriter(BlockWriter):
 
         self._write_value(f"{value:08x}")
 
-    def write_int(self, value: int):
+    def write_int(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
 
@@ -647,7 +688,7 @@ class TextBlockWriter(BlockWriter):
 
         self._write_value(str(value))
 
-    def write_uint(self, value: int):
+    def write_uint(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
 
@@ -656,7 +697,7 @@ class TextBlockWriter(BlockWriter):
 
         self._write_value(str(value))
 
-    def write_float(self, value: float):
+    def write_float(self, value: float) -> None:
         if not isinstance(value, (int, float)):
             raise TypeError(
                 f"Parameter 'value' must be float or int, but got {type(value).__name__}"
@@ -676,7 +717,7 @@ class TextBlockWriter(BlockWriter):
         
         self._write_value(text)
 
-    def write_string(self, value: str):
+    def write_string(self, value: str) -> None:
         if not isinstance(value, str):
             raise TypeError(f"Parameter 'value' must be str, but got {type(value).__name__}")
 
@@ -685,7 +726,7 @@ class TextBlockWriter(BlockWriter):
 
         self._write_value(value)
 
-    def write_comment(self, text: str):
+    def write_comment(self, text: str) -> None:
         if not isinstance(text, str):
             raise TypeError(f"Parameter 'text' must be str, but got {type(text).__name__}")
 
@@ -712,7 +753,15 @@ class TextBlockWriter(BlockWriter):
         if self.block_format.newline_after_closing:
             self._write_newline()
 
-    def flush(self):
+    def report_total(self, total: int) -> None:
+        if self.parent is not None:
+            self.parent.report_total(message)
+    
+    def report_progress(self, current: int, message: str) -> None:
+        if self.parent is not None:
+            self.parent.report_progress(message)
+    
+    def flush(self) -> None:
         if self._closed:
             return
 
@@ -733,7 +782,7 @@ class TextBlockWriter(BlockWriter):
 
             self.stream.flush()
 
-    def close(self):
+    def close(self) -> None:
         if self._closed:
             return
 
@@ -747,8 +796,9 @@ class TextFileWriter(TextBlockWriter):
         self,
         stream: Union[io.TextIOBase, io.StringIO],
         filepath: str,
-        encoding="utf-8",
-        is_compressed: bool = False,
+        encoding: str,
+        is_compressed: bool,
+        progress: ProgressReporter,
         verbose: Verbose = None
     ):
         super().__init__(
@@ -758,14 +808,21 @@ class TextFileWriter(TextBlockWriter):
             verbose=verbose
         )
         self.filepath = filepath
+        self.progress = progress
         self.is_compressed = is_compressed
         self.is_closed = False
 
-    def flush(self):
+    def report_total(self, total: int) -> None:
+        self.progress.total(total)
+    
+    def report_progress(self, current: int, message: str) -> None:
+        self.progress.update(current, message)
+    
+    def flush(self) -> None:
         super().flush()
         self.is_closed = self._closed
 
-    def close(self):
+    def close(self) -> None:
         if self.is_closed:
             return
 
@@ -796,6 +853,8 @@ class TextFileWriter(TextBlockWriter):
                     uncompressed_size,
                     self.filepath,
                 )
+        
+        self.progress.complete()
 
         if verbosity_enabled(self.verbose, logging.INFO):
             logger.info("Closed writer for '%s'", self.filepath)
@@ -841,7 +900,7 @@ class BinaryBlockWriter(BlockWriter):
         block_id: TokenID,
         block_label: Optional[str] = None,
         block_format: Optional[BlockFormat] = None
-    ):
+    ) -> None:
         sub_block = BinaryBlockWriter(
             stream=self.stream,
             parent=self,
@@ -856,23 +915,16 @@ class BinaryBlockWriter(BlockWriter):
         level = logging.INFO if self.parent is None else logging.DEBUG
 
         if verbosity_enabled(self.verbose, level):
-            if block_label:
-                logger.log(
-                    level,
-                    "Writing binary block: '%s' (label: %s)",
-                    block_id.name,
-                    block_label,
-                )
-            else:
-                logger.log(
-                    level,
-                    "Writing binary block: '%s'",
-                    block_id.name,
-                )
+            logger.log(
+                level,
+                "Writing binary block: '%s'%s",
+                block_id.name,
+                " (label: %s)" % block_label if block_label else "",
+            )
 
         return sub_block
 
-    def end_sub_block(self):
+    def end_sub_block(self) -> None:
         if not self._writing_block:
             return
 
@@ -908,7 +960,7 @@ class BinaryBlockWriter(BlockWriter):
         else:
             raise BlockWriterError("No output stream set for root writer, and no parent-writer.")
     
-    def write_count(self, value: int):
+    def write_count(self, value: int) -> None:
         if not isinstance(value, int):
             raise TypeError(f"Parameter 'value' must be int, but got {type(value).__name__}")
 
@@ -971,18 +1023,26 @@ class BinaryBlockWriter(BlockWriter):
         self._write_bytes(self._UINT16.pack(len(value)))
         self._write_bytes(encoded)
 
-    def write_comment(self, text: str):
+    def write_comment(self, text: str) -> None:
         if not isinstance(text, str):
             raise TypeError(f"Parameter 'text' must be str, but got {type(text).__name__}")
 
         if verbosity_enabled(self.verbose, logging.DEBUG):
             logger.debug("Write comment: %r", text)
 
-    def flush(self):
+    def report_total(self, total: int) -> None:
+        if self.parent is not None:
+            self.parent.report_total(message)
+    
+    def report_progress(self, current: int, message: str) -> None:
+        if self.parent is not None:
+            self.parent.report_progress(message)
+    
+    def flush(self) -> None:
         if self.stream:
             self.stream.flush()
 
-    def close(self):
+    def close(self) -> None:
         if self.stream and not self.stream.closed:
             self.stream.close()
 
@@ -993,9 +1053,10 @@ class BinaryFileWriter(BinaryBlockWriter):
         self,
         stream: BinaryIO,
         filepath: str,
-        token_offset: int = 0,
-        is_utf16le: bool = False,
-        is_compressed: bool = False,
+        token_offset: int,
+        is_utf16le: bool,
+        is_compressed: bool,
+        progress: ProgressReporter,
         verbose: Verbose = None
     ):
         super().__init__(
@@ -1005,6 +1066,7 @@ class BinaryFileWriter(BinaryBlockWriter):
             verbose=verbose
         )
         self.filepath = filepath
+        self.progress = progress
         self.is_utf16le = is_utf16le
         self.is_compressed = is_compressed
         self.is_closed = False
@@ -1014,12 +1076,18 @@ class BinaryFileWriter(BinaryBlockWriter):
             raise BlockWriterError("No output stream set")
         
         self.stream.write(data)
+    
+    def report_total(self, total: int) -> None:
+        self.progress.total(total)
+    
+    def report_progress(self, current: int, message: str) -> None:
+        self.progress.update(current, message)
 
-    def flush(self):
+    def flush(self) -> None:
         if not self.is_closed and self.stream:
             self.stream.flush()
 
-    def close(self):
+    def close(self) -> None:
         if self.is_closed or self.stream is None:
             return
 
@@ -1053,6 +1121,8 @@ class BinaryFileWriter(BinaryBlockWriter):
                     uncompressed_size,
                     self.filepath,
                 )
+        
+        self.progress.complete()
 
         if verbosity_enabled(self.verbose, logging.INFO):
             logger.info("Closed writer for '%s'", self.filepath)

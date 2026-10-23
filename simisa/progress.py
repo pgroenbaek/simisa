@@ -31,19 +31,24 @@ class ProgressReporter:
     Progress is represented as a float between 0.0 and 1.0. Callback
     invocation is throttled according to the configured progress interval.
     A callback is also triggered when the progress message changes.
-
-    Args:
-        callback: Function called with a progress message and a progress value
-            between 0.0 and 1.0. If None, progress reporting is disabled.
-        interval: Minimum progress change required between callbacks with the
-            same message. Defaults to 0.01.
-
-    Raises:
-        TypeError: If callback is not callable or None, or if interval is not
-            a float or int.
-        ValueError: If interval is outside the range 0.0 to 1.0.
     """
+
     def __init__(self, callback: Optional[ProgressCallback] = None, interval: float = 0.01):
+        """
+        Initialize a progress reporter.
+
+        Args:
+            callback: Function called with a progress message and a progress
+                value between 0.0 and 1.0. If None, progress reporting is
+                disabled.
+            interval: Minimum progress change required between callbacks with
+                the same message. Defaults to 0.01.
+
+        Raises:
+            TypeError: If callback is not callable or None, or if interval is
+                not a float or int.
+            ValueError: If interval is outside the range 0.0 to 1.0.
+        """
         if callback is not None:
             if not callable(callback):
                 raise TypeError(
@@ -79,28 +84,48 @@ class ProgressReporter:
 
         self.callback = callback
         self.interval = float(interval)
+        self._total = 0
         self._last_progress: Optional[float] = None
         self._last_message: Optional[str] = None
 
-    def report(self, message: str, current_bytes: int, total_bytes: int) -> None:
+    def total(self, total: int) -> None:
+        """
+        Set the total possible progress of an operation.
+
+        Args:
+            total: Total possible progress of an operation.
+
+        Raises:
+            TypeError: If a parameter is not of the expected type.
+        """
+        if self.callback is None:
+            return
+
+        if not isinstance(total, int):
+            raise TypeError(
+                f"Parameter 'total' must be int, but got {type(total).__name__}"
+            )
+
+        self._total = total
+    
+    def update(self, message: str, current: int) -> None:
         """
         Report the current progress of an operation.
 
-        The callback is triggered when this is the first report, the message
+        The callback is triggered when this is the first update, the message
         changes, progress advances by at least the configured interval, or
         progress reaches 1.0.
 
-        Progress is calculated from current_bytes and total_bytes and clamped
-        to the range 0.0 to 1.0. If total_bytes is zero or negative, progress
+        Progress is calculated from current and total and clamped
+        to the range 0.0 to 1.0. If total is zero or negative, progress
         is reported as 0.0.
 
         Args:
             message: Human-readable description of the current operation.
-            current_bytes: Number of bytes processed so far.
-            total_bytes: Total number of bytes in the operation.
+            current: Number of items processed so far.
 
         Raises:
-            TypeError: If message is not a string.
+            TypeError: If a parameter is not of the expected type.
         """
         if self.callback is None:
             return
@@ -109,11 +134,16 @@ class ProgressReporter:
             raise TypeError(
                 f"Parameter 'message' must be str, but got {type(message).__name__}"
             )
+        
+        if not isinstance(current, int):
+            raise TypeError(
+                f"Parameter 'current' must be int, but got {type(current).__name__}"
+            )
 
-        if total_bytes <= 0:
+        if self._total <= 0:
             progress = 0.0
         else:
-            progress = current_bytes / total_bytes
+            progress = current / self._total
             progress = max(0.0, min(1.0, progress))
 
         should_report = (
@@ -135,7 +165,7 @@ class ProgressReporter:
         """
         Report that the operation has completed.
 
-        Reports progress as 1.0 regardless of the last calculated byte
+        Reports progress as 1.0 regardless of the last calculated item
         progress. An identical completion report is not emitted more than
         once.
 
@@ -143,7 +173,7 @@ class ProgressReporter:
             message: Human-readable completion message. Defaults to "Finished".
 
         Raises:
-            TypeError: If message is not a string.
+            TypeError: If a parameter is not of the expected type.
         """
         if self.callback is None:
             return

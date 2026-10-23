@@ -210,7 +210,7 @@ class BlockReader(ABC):
             BlockReader: Instance of `BinaryFileReader` or `TextFileReader`.
 
         Raises:
-            TypeError: If `filepath` is not a string.
+            TypeError: If a parameter is not of the expected type.
             SimisaHeaderError: If the file header is missing or unrecognized.
             SimisaSubheaderError: If the subheader is invalid or unsupported.
             UnresolvableIncludeError: If includes within the file cannot be resolved.
@@ -219,6 +219,7 @@ class BlockReader(ABC):
         if not isinstance(filepath, str):
             raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
+        progress = ProgressReporter(progress)
         verbose = normalize_verbosity(verbose)
 
         compressed = is_compressed(filepath, verbose=verbose)
@@ -325,7 +326,15 @@ class BlockReader(ABC):
                         token_offset,
                     )
                 
-                return BinaryFileReader(stream, filepath, filetype, fileversion, token_offset, verbose=verbose)
+                return BinaryFileReader(
+                    stream,
+                    filepath,
+                    filetype,
+                    fileversion,
+                    token_offset,
+                    progress,
+                    verbose=verbose
+                )
 
             if fileformat != "t":
                 raise SimisaSubheaderError(f"Unrecognized subheader '{subheader}' in {filepath}")
@@ -340,7 +349,15 @@ class BlockReader(ABC):
                     encoding,
                 )
 
-            return TextFileReader(text_stream, filepath, filetype, fileversion, encoding, verbose=verbose)
+            return TextFileReader(
+                text_stream,
+                filepath,
+                filetype,
+                fileversion,
+                encoding,
+                progress,
+                verbose=verbose
+            )
 
         except Exception:
             f.close()
@@ -363,7 +380,7 @@ class BlockReader(ABC):
             BlockReader: Instance of `TextFileReader` over the provided string data.
 
         Raises:
-            TypeError: If `data` is not a string.
+            TypeError: If a parameter is not of the expected type.
             SimisaHeaderError: If the string does not start with a recognized header.
             SimisaSubheaderError: If the subheader is missing, too short, or binary.
             UnresolvableIncludeError: If `data` contains unresolved includes.
@@ -371,6 +388,7 @@ class BlockReader(ABC):
         if not isinstance(data, str):
             raise TypeError(f"Parameter 'data' must be str, but got {type(data).__name__}")
 
+        progress = ProgressReporter(progress)
         verbose = normalize_verbosity(verbose)
 
         data = data.lstrip("\ufeff\r\n\t ")
@@ -413,7 +431,15 @@ class BlockReader(ABC):
                 fileversion,
             )
         
-        return TextFileReader(stream, "<string>", filetype, fileversion, "utf-8", verbose=verbose)
+        return TextFileReader(
+            stream,
+            "<string>",
+            filetype,
+            fileversion,
+            "utf-8",
+            progress,
+            verbose=verbose
+        )
 
     def __iter__(self) -> Iterator["BlockReader"]:
         """
@@ -574,9 +600,13 @@ class BlockReader(ABC):
     @abstractmethod
     def read_string(self) -> str:
         pass
+    
+    @abstractmethod
+    def report_progress(self, message: str) -> None:
+        pass
 
     @abstractmethod
-    def close(self):
+    def close(self) -> None:
         pass
 
 
@@ -653,7 +683,7 @@ class TextBlockReader(BlockReader):
 
         return sub_block
 
-    def skip(self):
+    def skip(self) -> None:
         if self.at_end_of_block:
             return
 
@@ -696,7 +726,7 @@ class TextBlockReader(BlockReader):
             self.stf_reader.depth == self.start_depth
         )
 
-    def verify_end_of_block(self):
+    def verify_end_of_block(self) -> None:
         next_token = self.stf_reader.peek().value
         
         if next_token == '':
@@ -753,8 +783,12 @@ class TextBlockReader(BlockReader):
             logger.debug("Read string: %r", value)
 
         return value
+    
+    def report_progress(self, message: str) -> None:
+        if self.parent is not None:
+            self.parent.report_progress(message)
 
-    def close(self):
+    def close(self) -> None:
         if not self.is_closed:
 
             if self.stf_reader:
@@ -772,19 +806,21 @@ class TextFileReader(TextBlockReader):
         filetype: str,
         fileversion: int,
         encoding: str,
+        progress: ProgressReporter,
         verbose: Verbose = None
     ):
         super().__init__(verbose=verbose)
+        self.stream = stream
         self.filepath = filepath
         self.filetype = filetype
         self.fileversion = fileversion
         self.encoding = encoding
-        self.stream = stream
+        self.progress = progress
         self.is_closed = False
         self.at_end_of_block = False
         self.stf_reader = StfReader.from_stream(stream, filepath, verbose=self.verbose)
 
-    def skip(self):
+    def skip(self) -> None:
         if self.is_closed:
             return
 
@@ -792,7 +828,7 @@ class TextFileReader(TextBlockReader):
         self.is_closed = True
         self.at_end_of_block = True
 
-    def verify_end_of_block(self):
+    def verify_end_of_block(self) -> None:
         if self.is_closed:
             return
 
@@ -817,14 +853,24 @@ class TextFileReader(TextBlockReader):
             return True
 
         return self.stf_reader.eof()
+    
+    def report_progress(self, message: str) -> None:
+        current = self.stf_reader.bytes_read
 
-    def close(self):
+        self.progress.update(current, message)
+
+    def close(self) -> None:
         if not self.is_closed:
 
             if self.stf_reader:
                 self.stf_reader.close()
             
             self.is_closed = True
+        
+        self.progress.complete()
+
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info("Closed reader for '%s'", self.filepath)
 
 
 class BinaryBlockReader(BlockReader):
@@ -962,7 +1008,7 @@ class BinaryBlockReader(BlockReader):
 
         return value
     
-    def skip(self):
+    def skip(self) -> None:
         if self.remaining_bytes <= 0:
             return
 
@@ -990,7 +1036,7 @@ class BinaryBlockReader(BlockReader):
     def end_of_block(self) -> bool:
         return self.remaining_bytes == 0
 
-    def verify_end_of_block(self):
+    def verify_end_of_block(self) -> None:
         if not self.end_of_block():
             logger.warning(
                 f"Expected end of block '{self.id.name}' (id {self.id}), "
@@ -1003,8 +1049,12 @@ class BinaryBlockReader(BlockReader):
                 "Verified end of binary block '%s'",
                 self.id.name if self.id else '<root>',
             )
-
-    def close(self):
+    
+    def report_progress(self, message: str) -> None:
+        if self.parent is not None:
+            self.parent.report_progress(message)
+    
+    def close(self) -> None:
         if self.stream:
             self.stream.close()
             self.stream = None
@@ -1019,6 +1069,7 @@ class BinaryFileReader(BinaryBlockReader):
         filetype: str,
         fileversion: int,
         token_offset: int,
+        progress: ProgressReporter,
         verbose: Verbose = None
     ):
         super().__init__(verbose=verbose)
@@ -1027,9 +1078,10 @@ class BinaryFileReader(BinaryBlockReader):
         self.filetype = filetype
         self.fileversion = fileversion
         self.token_offset = token_offset
+        self.progress = progress
         self.remaining_bytes = float("inf")
 
-    def skip(self):
+    def skip(self) -> None:
         if self.stream is None:
             return
 
@@ -1051,7 +1103,7 @@ class BinaryFileReader(BinaryBlockReader):
 
         return self._buffer == b""
     
-    def verify_end_of_block(self):
+    def verify_end_of_block(self) -> None:
         if not self.end_of_block():
             logger.warning(
                 f"Expected end of file, but got extra data in {self.filepath}"
@@ -1062,8 +1114,18 @@ class BinaryFileReader(BinaryBlockReader):
                 "Verified end of binary block '%s'",
                 self.id.name if self.id else '<root>',
             )
+    
+    def report_progress(self, message: str) -> None:
+        current = self.stream.tell()
 
-    def close(self):
+        self.progress.update(current, message)
+
+    def close(self) -> None:
         if self.stream:
             self.stream.close()
+        
+        self.progress.complete()
+
+        if verbosity_enabled(self.verbose, logging.INFO):
+            logger.info("Closed reader for '%s'", self.filepath)
 
