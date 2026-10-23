@@ -150,8 +150,6 @@ def read_track_nodes(reader: BlockReader) -> List[TrackNode]:
     Returns:
         List[TrackNode]: The parsed track nodes.
     """
-    reader.report_progress("Reading track nodes...")
-
     with reader.sub_block(TokenID.TrackNodes) as track_nodes_block:
         if track_nodes_block is None:
             return []
@@ -160,6 +158,8 @@ def read_track_nodes(reader: BlockReader) -> List[TrackNode]:
         count = track_nodes_block.read_uint()
         
         for track_node_block in track_nodes_block:
+            reader.report_progress("Reading track nodes...")
+
             track_node_block.verify_id(TokenID.TrackNode)
 
             index = track_node_block.read_uint()
@@ -450,8 +450,6 @@ def read_tr_item_table(reader: BlockReader) -> List[TrItem]:
     Returns:
         List[TrItem]: The parsed track items.
     """
-    reader.report_progress("Reading track items...")
-
     with reader.sub_block(TokenID.TrItemTable) as tr_item_table_block:
         if tr_item_table_block is None:
             return []
@@ -460,6 +458,8 @@ def read_tr_item_table(reader: BlockReader) -> List[TrItem]:
         count = tr_item_table_block.read_uint()
         
         for sub_block in tr_item_table_block:
+            reader.report_progress("Reading track items...")
+
             tr_item = None
 
             if sub_block.id == TokenID.EmptyItem:
