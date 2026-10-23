@@ -24,6 +24,7 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..progress import ProgressCallback
 from ..verbosity import Verbose
 from ..tracksections.reader import read_local_tracksections
 from .models import *
@@ -32,7 +33,11 @@ logger = logging.getLogger(__name__)
 
 
 
-def load(filepath: str, verbose: Verbose = None) -> World:
+def load(
+    filepath: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> World:
     """
     Load and parse a world file from disk.
 
@@ -42,13 +47,14 @@ def load(filepath: str, verbose: Verbose = None) -> World:
 
     Args:
         filepath (str): Path to the world file.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         World: The parsed world object.
 
     Raises:
-        TypeError: If `filepath` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -59,7 +65,7 @@ def load(filepath: str, verbose: Verbose = None) -> World:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath, verbose=verbose) as reader:
+    with BlockReader.open(filepath, progress=progress, verbose=verbose) as reader:
 
         if not reader.filetype == 'w':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a world file?")
@@ -74,7 +80,11 @@ def load(filepath: str, verbose: Verbose = None) -> World:
         return world
 
 
-def loads(world_text: str, verbose: Verbose = None) -> World:
+def loads(
+    world_text: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> World:
     """
     Parse a world file from a string containing world data.
 
@@ -84,13 +94,14 @@ def loads(world_text: str, verbose: Verbose = None) -> World:
 
     Args:
         world_text (str): String containing world file data.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         World: The parsed world object.
 
     Raises:
-        TypeError: If `world_text` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -100,7 +111,7 @@ def loads(world_text: str, verbose: Verbose = None) -> World:
     if not isinstance(world_text, str):
         raise TypeError(f"Parameter 'world_text' must be str, but got {type(world_text).__name__}")
 
-    reader = BlockReader.from_string(world_text, verbose=verbose)
+    reader = BlockReader.from_string(world_text, progress=progress, verbose=verbose)
 
     if not reader.filetype == 'w':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a world file?")
@@ -139,6 +150,8 @@ def read_world_objects(reader: BlockReader) -> List[WorldObj]:
     Returns:
         List[WorldObj]: The parsed world objects.
     """
+    reader.report_progress("Reading world objects...")
+    
     reader.verify_id(TokenID.Tr_Worldfile)
 
     objects: List[WorldObj] = []

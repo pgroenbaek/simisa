@@ -24,7 +24,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import io
 import logging
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional, Union, TextIO
 
 from .include import resolve_include
 from .units import Units
@@ -69,6 +69,8 @@ class StfToken:
 
 
 class StfLexer:
+    _CHUNK_SIZE = 8192
+
     _EOF_TOKEN = StfToken("eof", "")
     _LEFT_PARENTHESIS_TOKEN = StfToken("(", "(")
     _RIGHT_PARENTHESIS_TOKEN = StfToken(")", ")")
@@ -80,11 +82,17 @@ class StfLexer:
         "_info", "_INFO", "_Info", "_iNfO", "_inFo", "_infO", "_INfO", "_InFo",
     })
     
-    def __init__(self, stream, verbose: Verbose = None):
+    def __init__(self, stream: TextIO, verbose: Verbose = None):
         self.stream = stream
         self.verbose = normalize_verbosity(verbose)
-        self._buffer = self.stream.read(8192)
+        self._chars_consumed = 0
+        self._buffer = self.stream.read(self._CHUNK_SIZE)
+        self._buffer_size = len(self._buffer)
         self._position = 0
+    
+    @property
+    def chars_read(self) -> int:
+        return self._chars_consumed + self._position
 
     def next_token(self):
         while True:
@@ -118,7 +126,9 @@ class StfLexer:
             return token
 
     def _refill(self):
-        self._buffer = self.stream.read(8192)
+        self._chars_consumed += self._buffer_size - len(self._buffer) + self._position
+        self._buffer = self.stream.read(self._CHUNK_SIZE)
+        self._buffer_size = len(self._buffer)
         self._position = 0
 
     def _read(self):
@@ -283,6 +293,10 @@ class StfTokenStream:
         self.buffer = self.lexer.next_token()
         self.current = None
 
+    @property
+    def chars_read(self) -> int:
+        return self.lexer.chars_read
+
     def next(self) -> StfToken:
         self.current = self.buffer
         self.buffer = self.lexer.next_token()
@@ -298,14 +312,14 @@ class StfTokenStream:
 class StfReader:
 
     @classmethod
-    def from_stream(cls, stream, filepath: str = "", verbose: Verbose = None):
+    def from_stream(cls, stream: TextIO, filepath: str = "", verbose: Verbose = None):
         lexer = StfLexer(stream, verbose=verbose)
         token_stream = StfTokenStream(lexer)
 
         return cls(token_stream, filepath, verbose=verbose)
     
-    def __init__(self, stream: StfTokenStream, filepath: str = "", verbose: Verbose = None):
-        self.stream = stream
+    def __init__(self, token_stream: StfTokenStream, filepath: str = "", verbose: Verbose = None):
+        self.token_stream = token_stream
         self.filepath = filepath
         self.verbose = normalize_verbosity(verbose)
         self.injected: Optional["StfReader"] = None
@@ -313,6 +327,10 @@ class StfReader:
         self.label = None
         self.depth = 0
         self._ended = False
+    
+    @property
+    def chars_read(self) -> int:
+        return self.token_stream.chars_read
 
     def next(self) -> StfToken:
         while self.injected is not None:
@@ -322,13 +340,13 @@ class StfReader:
 
             return self.injected.next()
 
-        token = self.stream.next()
+        token = self.token_stream.next()
 
         if token.is_word and token.value == "include":
             return self._handle_include()
 
         return token
-
+    
     def peek(self) -> StfToken:
         while self.injected is not None:
             if self.injected.eof():
@@ -337,7 +355,7 @@ class StfReader:
 
             return self.injected.peek()
 
-        return self.stream.peek()
+        return self.token_stream.peek()
 
     def inject(self, reader: "StfReader"):
         if self.injected is not None:
@@ -376,7 +394,7 @@ class StfReader:
         return self.next()
 
     def eof(self):
-        return self.injected is None and self.stream.eof()
+        return self.injected is None and self.token_stream.eof()
 
     def read_item(self):
         token = self.next()

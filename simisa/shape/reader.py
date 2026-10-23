@@ -23,6 +23,7 @@ from typing import List
 from .. import TokenID
 from ..reader import BlockReader
 from ..header import SimisaSubheaderError
+from ..progress import ProgressCallback
 from ..verbosity import Verbose
 from .models import *
 
@@ -30,7 +31,11 @@ logger = logging.getLogger(__name__)
 
 
 
-def load(filepath: str, verbose: Verbose = None) -> Shape:
+def load(
+    filepath: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> Shape:
     """
     Load and parse a shape file from disk.
 
@@ -40,13 +45,14 @@ def load(filepath: str, verbose: Verbose = None) -> Shape:
 
     Args:
         filepath (str): Path to the shape file.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         Shape: The parsed shape object.
 
     Raises:
-        TypeError: If `filepath` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -57,7 +63,7 @@ def load(filepath: str, verbose: Verbose = None) -> Shape:
     if not isinstance(filepath, str):
         raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-    with BlockReader.open(filepath, verbose=verbose) as reader:
+    with BlockReader.open(filepath, progress=progress, verbose=verbose) as reader:
 
         if not reader.filetype == 's':
             raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a shape file?")
@@ -65,7 +71,11 @@ def load(filepath: str, verbose: Verbose = None) -> Shape:
         return read_shape(reader)
 
 
-def loads(shape_text: str, verbose: Verbose = None) -> Shape:
+def loads(
+    shape_text: str,
+    progress: ProgressCallback = None,
+    verbose: Verbose = None
+) -> Shape:
     """
     Parse a shape from a string containing shape data.
 
@@ -75,13 +85,14 @@ def loads(shape_text: str, verbose: Verbose = None) -> Shape:
 
     Args:
         shape_text (str): String containing shape file data.
+        progress (ProgressCallback, optional): Callback for receiving progress updates.
         verbose (Verbose, optional): Verbosity level for logging.
 
     Returns:
         Shape: The parsed shape object.
 
     Raises:
-        TypeError: If `shape_text` is not a string.
+        TypeError: If a parameter is not of the expected type.
         SimisaHeaderError: If the data has an invalid or unrecognized SIMISA header.
         SimisaSubheaderError: If the data has an invalid or unrecognized SIMISA subheader.
         BlockReaderError: If the block reader encounters an error or malformed data.
@@ -91,7 +102,7 @@ def loads(shape_text: str, verbose: Verbose = None) -> Shape:
     if not isinstance(shape_text, str):
         raise TypeError(f"Parameter 'shape_text' must be str, but got {type(shape_text).__name__}")
 
-    reader = BlockReader.from_string(shape_text, verbose=verbose)
+    reader = BlockReader.from_string(shape_text, progress=progress, verbose=verbose)
 
     if not reader.filetype == 's':
         raise SimisaSubheaderError(f"Unrecognized filetype '{reader.filetype}' in subheader. Is it a shape file?")
@@ -112,6 +123,8 @@ def read_shape(reader: BlockReader) -> Shape:
     Returns:
         Shape: The parsed shape.
     """
+    reader.report_progress("Reading shape data...")
+
     with reader.sub_block(TokenID.shape) as shape_block:
         shape_header = read_shape_header(shape_block)
         volumes = read_volumes(shape_block)
@@ -201,6 +214,8 @@ def read_volumes(reader: BlockReader) -> List[VolumeSphere]:
         count = volumes_block.read_int()
         
         for vol_sphere_block in volumes_block:
+            reader.report_progress("Reading volumes...")
+
             vol_sphere_block.verify_id(TokenID.vol_sphere)
 
             vector = read_vector(vol_sphere_block)
@@ -311,6 +326,8 @@ def read_points(reader: BlockReader) -> List[Point]:
         count = points_block.read_int()
         
         for point_block in points_block:
+            reader.report_progress("Reading points...")
+
             point_block.verify_id(TokenID.point)
 
             x = point_block.read_float()
@@ -345,6 +362,8 @@ def read_uv_points(reader: BlockReader) -> List[UVPoint]:
         count = uv_points_block.read_int()
         
         for uv_point_block in uv_points_block:
+            reader.report_progress("Reading UV points...")
+
             uv_point_block.verify_id(TokenID.uv_point)
 
             u = uv_point_block.read_float()
@@ -377,6 +396,8 @@ def read_normals(reader: BlockReader) -> List[Vector]:
         count = normals_block.read_int()
         
         for vector_block in normals_block:
+            reader.report_progress("Reading normals...")
+
             vector_block.verify_id(TokenID.vector)
 
             x = vector_block.read_float()
@@ -481,6 +502,8 @@ def read_matrices(reader: BlockReader) -> List[Matrix]:
         count = matrices_block.read_int()
         
         for matrix_block in matrices_block:
+            reader.report_progress("Reading matrices...")
+
             matrix_block.verify_id(TokenID.matrix)
 
             name = matrix_block.label
@@ -563,6 +586,8 @@ def read_textures(reader: BlockReader) -> List[Texture]:
         count = textures_block.read_int()
         
         for texture_block in textures_block:
+            reader.report_progress("Reading textures...")
+
             texture_block.verify_id(TokenID.texture)
 
             image_index = texture_block.read_int()
@@ -751,6 +776,8 @@ def read_vtx_states(reader: BlockReader) -> List[VtxState]:
         count = vtx_states_block.read_int()
         
         for vtx_state_block in vtx_states_block:
+            reader.report_progress("Reading vtx states...")
+
             vtx_state_block.verify_id(TokenID.vtx_state)
 
             flags = vtx_state_block.read_flags()
@@ -795,6 +822,8 @@ def read_prim_states(reader: BlockReader) -> List[PrimState]:
         count = prim_states_block.read_int()
         
         for prim_state_block in prim_states_block:
+            reader.report_progress("Reading prim states...")
+
             prim_state_block.verify_id(TokenID.prim_state)
 
             name = prim_state_block.label
@@ -937,8 +966,8 @@ def read_distance_level_header(reader: BlockReader) -> DistanceLevelHeader:
         hierarchy: List[int] = []
         
         with dlevel_header_block.sub_block(TokenID.dlevel_selection) as dlevel_selection_block:
-            dlevel_selection = float(dlevel_selection_block.read_uint())
-
+            dlevel_selection = int(dlevel_selection_block.read_float())
+        
         with dlevel_header_block.sub_block(TokenID.hierarchy) as hierarchy_block:
             count = hierarchy_block.read_int()
             
@@ -969,7 +998,7 @@ def read_sub_objects(reader: BlockReader) -> List[SubObject]:
         sub_objects: List[SubObject] = []
         count = sub_objects_block.read_int()
         
-        for sub_object_block in sub_objects_block:
+        for idx, sub_object_block in enumerate(sub_objects_block):
             sub_object_block.verify_id(TokenID.sub_object)
 
             sub_object_header = read_sub_object_header(sub_object_block)
@@ -1039,6 +1068,8 @@ def read_geometry_info(reader: BlockReader) -> GeometryInfo:
     Returns:
         GeometryInfo: The parsed geometry information.
     """
+    reader.report_progress("Reading geometry info...")
+
     with reader.sub_block(TokenID.geometry_info) as geometry_info_block:
         face_normals = geometry_info_block.read_int()
         tx_light_cmds = geometry_info_block.read_int()
@@ -1224,6 +1255,8 @@ def read_vertices(reader: BlockReader) -> List[Vertex]:
         count = vertices_block.read_int()
         
         for vertex_block in vertices_block:
+            reader.report_progress("Reading vertices...")
+
             vertex_block.verify_id(TokenID.vertex)
 
             flags = vertex_block.read_flags()
@@ -1375,6 +1408,8 @@ def read_vertex_idxs(reader: BlockReader) -> List[VertexIdx]:
         count = vertex_idxs_block.read_int()
         
         for _ in range(count // 3):
+            reader.report_progress("Reading vertex idxs...")
+
             vertex1_index = vertex_idxs_block.read_int()
             vertex2_index = vertex_idxs_block.read_int()
             vertex3_index = vertex_idxs_block.read_int()
@@ -1407,6 +1442,8 @@ def read_normal_idxs(reader: BlockReader) -> List[NormalIdx]:
         count = normal_idxs_block.read_int()
         
         for _ in range(count):
+            reader.report_progress("Reading normal idxs...")
+
             index = normal_idxs_block.read_int()
             unknown2 = normal_idxs_block.read_int()
 
@@ -1437,6 +1474,8 @@ def read_flags(reader: BlockReader) -> List[int]:
         count = flags_block.read_int()
         
         for _ in range(count):
+            reader.report_progress("Reading flags...")
+
             flags.append(flags_block.read_flags())
 
         flags_block.verify_count(count, len(flags))
@@ -1496,6 +1535,8 @@ def read_anim_nodes(reader: BlockReader) -> List[AnimationNode]:
         count = anim_nodes_block.read_int()
         
         for anim_node_block in anim_nodes_block:
+            reader.report_progress("Reading animation nodes...")
+
             anim_node_block.verify_id(TokenID.anim_node)
 
             name = anim_node_block.label

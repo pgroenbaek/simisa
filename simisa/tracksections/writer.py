@@ -22,6 +22,7 @@ import math
 from .. import TokenID
 from ..format import BlockFormat
 from ..writer import BlockWriter
+from ..progress import ProgressCallback
 from ..verbosity import Verbose
 from .models import *
 
