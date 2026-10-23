@@ -123,6 +123,8 @@ def read_shape(reader: BlockReader) -> Shape:
     Returns:
         Shape: The parsed shape.
     """
+    reader.report_progress("Reading shape data...")
+
     with reader.sub_block(TokenID.shape) as shape_block:
         shape_header = read_shape_header(shape_block)
         volumes = read_volumes(shape_block)
@@ -317,6 +319,8 @@ def read_points(reader: BlockReader) -> List[Point]:
     Returns:
         List[Point]: The parsed points.
     """
+    reader.report_progress("Reading points...")
+
     with reader.sub_block(TokenID.points) as points_block:
         points: List[Point] = []
         count = points_block.read_int()
@@ -351,6 +355,8 @@ def read_uv_points(reader: BlockReader) -> List[UVPoint]:
     Returns:
         List[UVPoint]: The parsed UV points.
     """
+    reader.report_progress("Reading UV points...")
+
     with reader.sub_block(TokenID.uv_points) as uv_points_block:
         uv_points: List[UVPoint] = []
         count = uv_points_block.read_int()
@@ -383,6 +389,8 @@ def read_normals(reader: BlockReader) -> List[Vector]:
     Returns:
         List[Vector]: The parsed normals.
     """
+    reader.report_progress("Reading normals...")
+
     with reader.sub_block(TokenID.normals) as normals_block:
         normals: List[Vector] = []
         count = normals_block.read_int()
@@ -918,7 +926,7 @@ def read_distance_levels(reader: BlockReader) -> List[DistanceLevel]:
             distance_level_block.verify_id(TokenID.distance_level)
 
             distance_level_header = read_distance_level_header(distance_level_block)
-            sub_objects = read_sub_objects(distance_level_block)
+            sub_objects = read_sub_objects(distance_level_block, distance_level_header)
 
             distance_level = DistanceLevel(
                 distance_level_header=distance_level_header,
@@ -964,7 +972,7 @@ def read_distance_level_header(reader: BlockReader) -> DistanceLevelHeader:
         )
 
 
-def read_sub_objects(reader: BlockReader) -> List[SubObject]:
+def read_sub_objects(reader: BlockReader, distance_level_header: DistanceLevelHeader) -> List[SubObject]:
     """
     Read and parse sub-objects from a BlockReader.
 
@@ -972,6 +980,7 @@ def read_sub_objects(reader: BlockReader) -> List[SubObject]:
 
     Args:
         reader (BlockReader): Reader positioned at a sub-objects block.
+        distance_level_header (DistanceLevelHeader): The distance level header.
 
     Returns:
         List[SubObject]: The parsed sub-objects.
@@ -980,7 +989,10 @@ def read_sub_objects(reader: BlockReader) -> List[SubObject]:
         sub_objects: List[SubObject] = []
         count = sub_objects_block.read_int()
         
-        for sub_object_block in sub_objects_block:
+        for idx, sub_object_block in enumerate(sub_objects_block):
+            distance_level = int(distance_level_header.dlevel_selection)
+            reader.report_progress(f"Reading sub object {idx + 1} in LOD level {distance_level}...")
+
             sub_object_block.verify_id(TokenID.sub_object)
 
             sub_object_header = read_sub_object_header(sub_object_block)
@@ -1467,6 +1479,8 @@ def read_animations(reader: BlockReader) -> List[Animation]:
     Returns:
         List[Animation]: The parsed animations.
     """
+    reader.report_progress(f"Reading animations...")
+
     with reader.sub_block(TokenID.animations) as animations_block:
         animations: List[Animation] = []
         count = animations_block.read_int()

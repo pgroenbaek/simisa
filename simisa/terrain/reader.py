@@ -123,6 +123,8 @@ def read_terrain(reader: BlockReader) -> Terrain:
     Returns:
         Terrain: The parsed terrain.
     """
+    reader.report_progress("Reading terrain data...")
+
     with reader.sub_block(TokenID.terrain) as terrain_block:
         terrain = Terrain()
 
@@ -373,6 +375,8 @@ def read_terrain_patchsets(reader: BlockReader) -> List[TerrainPatchset]:
     Returns:
         List[TerrainPatchset]: The parsed terrain patchsets.
     """
+    reader.report_progress("Reading terrain patches...")
+
     with reader.sub_block(TokenID.terrain_patchsets) as patchsets_block:
         terrain_patchsets: List[TerrainPatchset] = []
         count = patchsets_block.read_int()

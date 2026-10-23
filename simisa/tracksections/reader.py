@@ -182,6 +182,8 @@ def read_global_tracksections(reader: BlockReader) -> TrackSections:
     Returns:
         TrackSections: The parsed track sections.
     """
+    reader.report_progress("Reading track sections...")
+
     reader.verify_id(TokenID.TrackSections)
 
     tracksections = TrackSections()
@@ -238,6 +240,8 @@ def read_local_tracksections(reader: BlockReader, read_max_sections: bool = True
     Returns:
         TrackSections: The parsed track sections.
     """
+    reader.report_progress("Reading track sections...")
+
     reader.verify_id(TokenID.TrackSections)
 
     tracksections = TrackSections()
@@ -346,6 +350,8 @@ def read_trackshapes(reader: BlockReader) -> TrackShapes:
     Returns:
         TrackShapes: The parsed track shapes.
     """
+    reader.report_progress("Reading track shapes...")
+
     reader.verify_id(TokenID.TrackShapes)
 
     trackshapes = TrackShapes()
@@ -508,6 +514,8 @@ def read_tsectionidx(reader: BlockReader) -> TSectionIdx:
     Returns:
         TSectionIdx: The parsed track section indices.
     """
+    reader.report_progress("Reading track paths...")
+
     reader.verify_id(TokenID.SectionIdx)
 
     tsectionidx = TSectionIdx()
