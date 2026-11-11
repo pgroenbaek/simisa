@@ -182,14 +182,14 @@ def read_global_tracksections(reader: BlockReader) -> TrackSections:
     Returns:
         TrackSections: The parsed track sections.
     """
-    reader.report_progress("Reading track sections...")
-
     reader.verify_id(TokenID.TrackSections)
 
     tracksections = TrackSections()
     tracksections.max_section_index = reader.read_uint()
 
     for tracksection_block in reader:
+        reader.report_progress("Reading track sections...")
+
         tracksection_block.verify_id(TokenID.TrackSection)
 
         section_index = tracksection_block.read_uint()
@@ -240,8 +240,6 @@ def read_local_tracksections(reader: BlockReader, read_max_sections: bool = True
     Returns:
         TrackSections: The parsed track sections.
     """
-    reader.report_progress("Reading track sections...")
-
     reader.verify_id(TokenID.TrackSections)
 
     tracksections = TrackSections()
@@ -250,6 +248,8 @@ def read_local_tracksections(reader: BlockReader, read_max_sections: bool = True
         tracksections.max_section_index = reader.read_uint()
 
     for tracksection_block in reader:
+        reader.report_progress("Reading track sections...")
+
         tracksection_block.verify_id(TokenID.TrackSection)
 
         with tracksection_block.sub_block(TokenID.SectionCurve) as section_curve_block:
@@ -350,14 +350,14 @@ def read_trackshapes(reader: BlockReader) -> TrackShapes:
     Returns:
         TrackShapes: The parsed track shapes.
     """
-    reader.report_progress("Reading track shapes...")
-
     reader.verify_id(TokenID.TrackShapes)
 
     trackshapes = TrackShapes()
     trackshapes.max_section_index = reader.read_uint()
 
     for trackshape_block in reader:
+        reader.report_progress("Reading track shapes...")
+
         trackshape_block.verify_id(TokenID.TrackShape)
 
         shape_index = trackshape_block.read_uint()
@@ -514,14 +514,14 @@ def read_tsectionidx(reader: BlockReader) -> TSectionIdx:
     Returns:
         TSectionIdx: The parsed track section indices.
     """
-    reader.report_progress("Reading track paths...")
-
     reader.verify_id(TokenID.SectionIdx)
 
     tsectionidx = TSectionIdx()
     count = reader.read_uint()
 
     for trackpath_block in reader:
+        reader.report_progress("Reading track paths...")
+
         trackpath_block.verify_id(TokenID.TrackPath)
 
         section_index = trackpath_block.read_uint()
