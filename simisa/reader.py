@@ -231,7 +231,6 @@ class BlockReader(ABC):
         if not isinstance(filepath, str):
             raise TypeError(f"Parameter 'filepath' must be str, but got {type(filepath).__name__}")
 
-        progress = ProgressReporter(progress)
         verbose = normalize_verbosity(verbose)
 
         total_size = os.path.getsize(filepath)
@@ -279,7 +278,7 @@ class BlockReader(ABC):
 
             text = resolve_includes(text, filepath, verbose=verbose)
             
-            return BlockReader.from_string(text, verbose=verbose)
+            return BlockReader.from_string(text, progress=progress, verbose=verbose)
 
         # Found the beginning of a valid header in the file, proceed to read normally.
         if verbosity_enabled(verbose, logging.INFO):
@@ -288,8 +287,9 @@ class BlockReader(ABC):
                 filepath,
                 compressed
             )
-
+    
         f = open(filepath, "rb")
+        progress = ProgressReporter(progress)
 
         try:
             bom = f.read(2)
