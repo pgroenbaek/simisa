@@ -287,7 +287,7 @@ class BlockReader(ABC):
                 filepath,
                 compressed
             )
-    
+
         f = open(filepath, "rb")
         progress = ProgressReporter(progress)
 
